@@ -11,3 +11,4 @@ chunk: chunk.c
 
 clean:
 	rm -f memlen
+	rm -f chunk
