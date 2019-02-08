@@ -1,7 +1,7 @@
-#include <stdint.h>
-#include <stdio.h>
+#include "chunk.h"
 
 uint8_t bytes_per_type[] = {
+    0x00, // undef
     0x01, // uint8
     0x01, // int8
     0x02, // uint16
@@ -17,6 +17,7 @@ uint8_t bytes_per_type[] = {
 };
 
 const char* name_per_type[] = {
+    "[undef]",
     "uint8",
     "int8",
     "uint16",
@@ -28,24 +29,14 @@ const char* name_per_type[] = {
     "float32",
     "float64",
     "utf8",
-    "[undef]",
     "chunk"
 };
 
-typedef struct chunk {
-    uint8_t type;
-    uint8_t nr_length_bytes;
-    uint64_t length;
-    uint8_t* data;
-} chunk_t;
-
-typedef void (*chunk_walk_callback_t)(chunk_t chunk, void* payload);
-
-void chunk_walk_object_counter(chunk_t chunk, void* payload) {
-    (*(uint64_t*)payload)++;
+uint8_t chunk_bytes_per_type(chunk_t chunk) {
+    return bytes_per_type[chunk.type];
 }
 
-chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_walk_callback_t callback, void* payload) {
+chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_callback_t callback, void* payload) {
     uint64_t index = 1;
     uint8_t head_byte = pointer[0];
 
@@ -62,7 +53,7 @@ chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_walk_callback_t callback, voi
 
     callback(chunk, payload);
 
-    if (chunk.type == 0x0c) {
+    if (chunk.type == CHUNK_TYPE_CHUNK) {
         uint64_t remaining = chunk.length;
         uint8_t* data = chunk.data;
         while (remaining) {
@@ -74,42 +65,4 @@ chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_walk_callback_t callback, voi
     }
 
     return chunk;
-}
-
-int main(int argc, char** argv) {
-
-    //0x14
-    //0x95
-    //0x82
-    //0x4f
-
-    uint8_t data[] = {
-        0x1c, // 1 length byte, data type 2
-        0x14, // 20 bytes long
-        0x10, //   1 length byte, data type 0
-        0x01, //   1 bytes long
-        0x09, //   data (9)
-        0x1c, //   1 length byte, data type 2
-        0x09, //   9 bytes long
-        0x10, //     1 length byte, data type 0
-        0x01, //     1 bytes long
-        0x09, //     data (9)
-        0x11, //     1 length byte, data type 1
-        0x01, //     1 bytes long
-        0x08, //     data (8)
-        0x12, //     1 length byte, data type 2
-        0x01, //     1 bytes long
-        0x07, //     data (7)
-        0x11, //   1 length byte, data type 1
-        0x01, //   1 bytes long
-        0x08, //   data (8)
-        0x12, //   1 length byte, data type 2
-        0x01, //   1 bytes long
-        0x07  //   data (7)
-    };
-    uint64_t counter;
-    chunk_walk_pointer(&data[0], chunk_walk_object_counter, &counter);
-
-    fprintf(stderr, "nr_objects: %lu\n", counter);
-    return 0;
 }

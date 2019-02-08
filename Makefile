@@ -1,14 +1,18 @@
-CC := gcc
-CFLAGS := -Wall -Werror -ggdb
+CC = gcc
+CFLAGS = -Wall -Werror -ggdb
 
-all: memlen chunk
+OBJECTS =
+OBJECTS += ast.o
+OBJECTS += chunk.o
 
-memlen: memlen.c
-	$(CC) $(CFLAGS) -o $@ $<
+all: test
 
-chunk: chunk.c
-	$(CC) $(CFLAGS) -o $@ $<
+test: test.c $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $<
+
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f memlen
-	rm -f chunk
+	rm -f $(OBJECTS)
+	rm -f test
