@@ -20,16 +20,18 @@ typedef enum chunk_type {
 } chunk_type_t;
 
 typedef struct chunk {
-    uint8_t type;
+    chunk_type_t type;
     uint8_t nr_length_bytes;
     uint64_t length;
     uint8_t* data;
 } chunk_t;
 
-typedef void (*chunk_callback_t)(chunk_t chunk, void* payload);
-
 uint8_t chunk_bytes_per_type(chunk_t chunk);
 
-chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_callback_t callback, void* payload);
+const char* chunk_type_name(chunk_type_t type);
+
+chunk_t chunk_decode(uint8_t* start);
+
+uint64_t chunk_total_length(chunk_t chunk);
 
 #endif

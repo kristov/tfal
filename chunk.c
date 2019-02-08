@@ -1,6 +1,6 @@
 #include "chunk.h"
 
-uint8_t bytes_per_type[] = {
+static uint8_t bytes_per_type[] = {
     0x00, // undef
     0x01, // uint8
     0x01, // int8
@@ -16,7 +16,7 @@ uint8_t bytes_per_type[] = {
     0x00, // chunk (length not defined)
 };
 
-const char* name_per_type[] = {
+static const char* name_per_type[] = {
     "[undef]",
     "uint8",
     "int8",
@@ -32,13 +32,17 @@ const char* name_per_type[] = {
     "chunk"
 };
 
+const char* chunk_type_name(chunk_type_t type) {
+    return name_per_type[type];
+}
+
 uint8_t chunk_bytes_per_type(chunk_t chunk) {
     return bytes_per_type[chunk.type];
 }
 
-chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_callback_t callback, void* payload) {
+chunk_t chunk_decode(uint8_t* start) {
     uint64_t index = 1;
-    uint8_t head_byte = pointer[0];
+    uint8_t head_byte = start[0];
 
     chunk_t chunk;
     chunk.type = (head_byte & 0x0f);
@@ -46,23 +50,13 @@ chunk_t chunk_walk_pointer(uint8_t* pointer, chunk_callback_t callback, void* pa
 
     chunk.length = 0;
     for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
-        chunk.length |= (pointer[index] << (0x08 * i));
+        chunk.length |= (start[index] << (0x08 * i));
         index++;
     }
-    chunk.data = &pointer[index];
-
-    callback(chunk, payload);
-
-    if (chunk.type == CHUNK_TYPE_CHUNK) {
-        uint64_t remaining = chunk.length;
-        uint8_t* data = chunk.data;
-        while (remaining) {
-            chunk_t child = chunk_walk_pointer(data, callback, payload);
-            uint64_t child_total = 1 + child.nr_length_bytes + child.length;
-            data = data + child_total;
-            remaining = remaining - child_total;
-        }
-    }
-
+    chunk.data = &start[index];
     return chunk;
+}
+
+uint64_t chunk_total_length(chunk_t chunk) {
+    return 1 + chunk.nr_length_bytes + chunk.length;
 }
