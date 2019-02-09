@@ -21,7 +21,7 @@ void ast_set_type(ast_node_t* node) {
             case CHUNK_TYPE_UINT8:
                 node->type = AST_NODE_SYMBOL;
                 break;
-            case CHUNK_TYPE_CHUNK:
+            case CHUNK_TYPE_SET:
                 node->type = AST_NODE_EXPRESSION;
                 break;
             case CHUNK_TYPE_UINT32:
@@ -53,7 +53,7 @@ ast_node_t* ast_build(uint8_t* start) {
 
     ast_node_t* parent = ast_node_make(chunk);
 
-    if (chunk.type == CHUNK_TYPE_CHUNK) {
+    if (chunk.type == CHUNK_TYPE_SET) {
         uint64_t remaining = chunk.length;
         uint8_t* data = chunk.data;
         while (remaining) {

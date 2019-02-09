@@ -1,5 +1,6 @@
 #include "chunk.h"
 #include <math.h>
+#include <string.h>
 
 static uint8_t bytes_per_type[] = {
     0x00, // undef
@@ -14,7 +15,7 @@ static uint8_t bytes_per_type[] = {
     0x04, // float32
     0x08, // float64
     0x01, // utf8
-    0x00, // chunk (length not defined)
+    0x00, // set (unknown)
 };
 
 static const char* name_per_type[] = {
@@ -30,7 +31,7 @@ static const char* name_per_type[] = {
     "float32",
     "float64",
     "utf8",
-    "chunk"
+    "set"
 };
 
 const char* chunk_type_name(chunk_type_t type) {
@@ -58,6 +59,27 @@ void chunk_make(uint8_t* start, chunk_t chunk) {
         *start = (chunk.length >> (0x08 * i));
         start++;
     }
+}
+
+uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth) {
+    if (chunk.type != CHUNK_TYPE_SET) {
+        return 0;
+    }
+    uint64_t remaining = chunk.length;
+    uint8_t* data = chunk.data;
+    uint64_t count = 0;
+    while (remaining) {
+        chunk_t child = chunk_decode(data);
+        uint64_t child_total = chunk_total_length(child);
+        if (count == nth) {
+            memcpy(dest, &child, sizeof(chunk_t));
+            return 1;
+        }
+        data = data + child_total;
+        remaining = remaining - child_total;
+        count++;
+    }
+    return 0;
 }
 
 chunk_t chunk_decode(uint8_t* start) {

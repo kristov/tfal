@@ -83,7 +83,7 @@ void test_decode_simple(test_harness_t* test) {
     chunk_t chunk = chunk_decode(data);
 
     is_equal_uint64(test, chunk.length, 1, "chunk is 1 bytes long");
-    is_equal_uint8(test, chunk.type, CHUNK_TYPE_UINT8, "chunk root is type CHUNK_TYPE_UINT8");
+    is_equal_uint8(test, chunk.type, CHUNK_TYPE_UINT8, "chunk is type CHUNK_TYPE_UINT8");
 }
 
 void test_decode_complex(test_harness_t* test) {
@@ -104,7 +104,7 @@ void test_decode_complex(test_harness_t* test) {
         0x12, //     1 length byte, data type 2
         0x01, //     1 bytes long
         0x07, //     data (7)
-        0x11, //   1 length byte, data type 1
+        0x13, //   1 length byte, data type 3
         0x01, //   1 bytes long
         0x08, //   data (8)
         0x12, //   1 length byte, data type 2
@@ -113,13 +113,26 @@ void test_decode_complex(test_harness_t* test) {
     };
     chunk_t chunk = chunk_decode(data);
 
-    is_equal_uint32(test, chunk.length, 20, "chunk is 20 bytes long");
-    is_equal_uint8(test, chunk.type, CHUNK_TYPE_CHUNK, "chunk root is type CHUNK_TYPE_CHUNK");
+    is_equal_uint64(test, chunk.length, 20, "chunk is 20 bytes long");
+    is_equal_uint8(test, chunk.type, CHUNK_TYPE_SET, "chunk root is type CHUNK_TYPE_SET");
+
+    chunk_t walk;
+    uint8_t found = chunk_set_get_nth(chunk, &walk, 2);
+    is_equal_uint8(test, found, 1, "found the third element in set");
+    is_equal_uint8(test, walk.type, CHUNK_TYPE_UINT16, "third element in set is CHUNK_TYPE_UINT16");
+
+    found = chunk_set_get_nth(chunk, &walk, 1);
+    is_equal_uint8(test, found, 1, "found the second element in set");
+    is_equal_uint8(test, walk.type, CHUNK_TYPE_SET, "second element in set is CHUNK_TYPE_SET");
+
+    found = chunk_set_get_nth(walk, &walk, 2);
+    is_equal_uint8(test, found, 1, "found the third element in sub-set");
+    is_equal_uint8(test, walk.type, CHUNK_TYPE_INT8, "third element in sub-set is CHUNK_TYPE_INT8");
 }
 
 int main(int argc, char** argv) {
     test_harness_t* test = test_harness_create();
-    test->verbose = 1;
+    //test->verbose = 1;
 
     test_decode_simple(test);
     test_decode_longer(test);
