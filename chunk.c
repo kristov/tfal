@@ -1,4 +1,5 @@
 #include "chunk.h"
+#include <math.h>
 
 static uint8_t bytes_per_type[] = {
     0x00, // undef
@@ -38,6 +39,25 @@ const char* chunk_type_name(chunk_type_t type) {
 
 uint8_t chunk_bytes_per_type(chunk_t chunk) {
     return bytes_per_type[chunk.type];
+}
+
+uint8_t chunk_nr_length_bytes(uint64_t length) {
+    uint8_t ans = 0;
+    while (length >>= 1) ans++;
+    return (uint8_t)(ans / 8) + 1;
+}
+
+void chunk_make(uint8_t* start, chunk_t chunk) {
+    uint8_t head = 0;
+    head = (head & 0xf0) | (chunk.type & 0xf);
+    head = (head & 0x0f) | ((chunk.nr_length_bytes & 0xf) << 4);
+    *start = head;
+    start++;
+    for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
+        *start = 0x00;
+        *start = (chunk.length >> (0x08 * i));
+        start++;
+    }
 }
 
 chunk_t chunk_decode(uint8_t* start) {

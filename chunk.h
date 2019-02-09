@@ -30,6 +30,10 @@ uint8_t chunk_bytes_per_type(chunk_t chunk);
 
 const char* chunk_type_name(chunk_type_t type);
 
+uint8_t chunk_nr_length_bytes(uint64_t length);
+
+void chunk_make(uint8_t* start, chunk_t chunk);
+
 chunk_t chunk_decode(uint8_t* start);
 
 uint64_t chunk_total_length(chunk_t chunk);
