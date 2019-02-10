@@ -93,6 +93,14 @@ chunk_t chunk_decode(uint8_t* start);
 uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth);
 
 /**
+ * @brief Get number of elements in set
+ *
+ * @param chunk A chunk
+ * @return Number of items in set
+ */
+uint64_t chunk_set_nr_items(chunk_t chunk);
+
+/**
  * @brief Total byte length of a chunk
  *
  * Returns the total number of bytes in the chunk, including the header.

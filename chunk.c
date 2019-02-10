@@ -62,6 +62,23 @@ void chunk_make(uint8_t* start, chunk_t chunk) {
     }
 }
 
+chunk_t chunk_decode(uint8_t* start) {
+    uint64_t index = 1;
+    uint8_t head_byte = start[0];
+
+    chunk_t chunk;
+    chunk.type = (head_byte & 0x0f);
+    chunk.nr_length_bytes = ((head_byte >> 0x04) & 0x0f);
+
+    chunk.length = 0;
+    for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
+        chunk.length |= (start[index] << (0x08 * i));
+        index++;
+    }
+    chunk.data = &start[index];
+    return chunk;
+}
+
 uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth) {
     if (chunk.type != CHUNK_TYPE_SET) {
         return 0;
@@ -98,23 +115,6 @@ uint64_t chunk_set_nr_items(chunk_t chunk) {
         count++;
     }
     return count;
-}
-
-chunk_t chunk_decode(uint8_t* start) {
-    uint64_t index = 1;
-    uint8_t head_byte = start[0];
-
-    chunk_t chunk;
-    chunk.type = (head_byte & 0x0f);
-    chunk.nr_length_bytes = ((head_byte >> 0x04) & 0x0f);
-
-    chunk.length = 0;
-    for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
-        chunk.length |= (start[index] << (0x08 * i));
-        index++;
-    }
-    chunk.data = &start[index];
-    return chunk;
 }
 
 uint64_t chunk_total_length(chunk_t chunk) {
