@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <stdio.h>
+
 static uint8_t bytes_per_type[] = {
     0x00, // undef
     0x01, // uint8
@@ -57,7 +59,7 @@ void chunk_make(uint8_t* start, chunk_t chunk) {
     start++;
     for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
         *start = 0x00;
-        *start = (chunk.length >> (0x08 * i));
+        *start = (chunk.total_length >> (0x08 * i));
         start++;
     }
 }
@@ -70,11 +72,13 @@ chunk_t chunk_decode(uint8_t* start) {
     chunk.type = (head_byte & 0x0f);
     chunk.nr_length_bytes = ((head_byte >> 0x04) & 0x0f);
 
-    chunk.length = 0;
+    chunk.data_length = 0;
     for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
-        chunk.length |= (start[index] << (0x08 * i));
+        chunk.data_length |= (start[index] << (0x08 * i));
         index++;
     }
+
+    chunk.total_length = 1 + chunk.nr_length_bytes + chunk.data_length;
     chunk.data = &start[index];
     return chunk;
 }
@@ -83,18 +87,48 @@ uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth) {
     if (chunk.type != CHUNK_TYPE_SET) {
         return 0;
     }
-    uint64_t remaining = chunk.length;
+    uint64_t remaining = chunk.data_length;
     uint8_t* data = chunk.data;
     uint64_t count = 0;
     while (remaining) {
         chunk_t child = chunk_decode(data);
-        uint64_t child_total = chunk_total_length(child);
         if (count == nth) {
             memcpy(dest, &child, sizeof(chunk_t));
             return 1;
         }
-        data = data + child_total;
-        remaining = remaining - child_total;
+        data = data + child.total_length;
+        remaining = remaining - child.total_length;
+        count++;
+    }
+    return 0;
+}
+
+uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx) {
+    if (chunk.type != CHUNK_TYPE_SET) {
+        return 0;
+    }
+    uint64_t remaining = chunk.total_length;
+    uint8_t* data = chunk.data;
+    uint64_t count = 0;
+    uint64_t offset = 1 + chunk.nr_length_bytes;
+    while (remaining) {
+        chunk_t child = chunk_decode(data);
+
+        if (count == idx[0]) {
+            idx = &idx[1];
+            nr_idx--;
+            if (nr_idx == 0) {
+                return offset;
+            }
+            if (child.type == CHUNK_TYPE_SET) {
+                offset += chunk_byte_offset(child, idx, nr_idx);
+                return offset;
+            }
+        }
+
+        offset += child.total_length;
+        data = data + child.total_length;
+        remaining = remaining - child.total_length;
         count++;
     }
     return 0;
@@ -104,19 +138,14 @@ uint64_t chunk_set_nr_items(chunk_t chunk) {
     if (chunk.type != CHUNK_TYPE_SET) {
         return 0;
     }
-    uint64_t remaining = chunk.length;
+    uint64_t remaining = chunk.total_length;
     uint8_t* data = chunk.data;
     uint64_t count = 0;
     while (remaining) {
         chunk_t child = chunk_decode(data);
-        uint64_t child_total = chunk_total_length(child);
-        data = data + child_total;
-        remaining = remaining - child_total;
+        data = data + child.total_length;
+        remaining = remaining - child.total_length;
         count++;
     }
     return count;
-}
-
-uint64_t chunk_total_length(chunk_t chunk) {
-    return 1 + chunk.nr_length_bytes + chunk.length;
 }

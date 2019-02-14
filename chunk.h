@@ -22,9 +22,15 @@ typedef enum chunk_type {
 typedef struct chunk {
     chunk_type_t type;
     uint8_t nr_length_bytes;
-    uint64_t length;
+    uint64_t total_length;
+    uint64_t data_length;
     uint8_t* data;
 } chunk_t;
+
+typedef struct chunk_rw {
+    uint64_t length;
+    uint64_t offset;
+} chunk_rw_t;
 
 /**
  * @brief Number of bytes for a given type
@@ -93,21 +99,21 @@ chunk_t chunk_decode(uint8_t* start);
 uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth);
 
 /**
+ * @brief Get the byte offset of an indexed item
+ *
+ * @param Starting chunk address
+ * @param List of 32 bit indexes
+ * @param Number of indexes in that list
+ * @return Byte offset
+ */
+uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx);
+
+/**
  * @brief Get number of elements in set
  *
  * @param chunk A chunk
  * @return Number of items in set
  */
 uint64_t chunk_set_nr_items(chunk_t chunk);
-
-/**
- * @brief Total byte length of a chunk
- *
- * Returns the total number of bytes in the chunk, including the header.
- *
- * @param chunk A chunk
- * @return Number of bytes for that chunk
- */
-uint64_t chunk_total_length(chunk_t chunk);
 
 #endif

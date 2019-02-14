@@ -54,14 +54,13 @@ ast_node_t* ast_build(uint8_t* start) {
     ast_node_t* parent = ast_node_make(chunk);
 
     if (chunk.type == CHUNK_TYPE_SET) {
-        uint64_t remaining = chunk.length;
+        uint64_t remaining = chunk.total_length;
         uint8_t* data = chunk.data;
         while (remaining) {
             ast_node_t* child = ast_build(data);
             ast_node_append(parent, child);
-            uint64_t child_total = chunk_total_length(child->chunk);
-            data = data + child_total;
-            remaining = remaining - child_total;
+            data = data + child->chunk.total_length;
+            remaining = remaining - child->chunk.total_length;
         }
     }
     ast_set_type(parent);
