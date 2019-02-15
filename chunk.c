@@ -107,7 +107,7 @@ uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx) {
     if (chunk.type != CHUNK_TYPE_SET) {
         return 0;
     }
-    uint64_t remaining = chunk.total_length;
+    uint64_t remaining = chunk.data_length;
     uint8_t* data = chunk.data;
     uint64_t count = 0;
     uint64_t offset = 1 + chunk.nr_length_bytes;
@@ -131,6 +131,13 @@ uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx) {
         remaining = remaining - child.total_length;
         count++;
     }
+    if (count == idx[0]) {
+        nr_idx--;
+        if (nr_idx == 0) {
+            return offset;
+        }
+    }
+
     return 0;
 }
 
@@ -138,7 +145,7 @@ uint64_t chunk_set_nr_items(chunk_t chunk) {
     if (chunk.type != CHUNK_TYPE_SET) {
         return 0;
     }
-    uint64_t remaining = chunk.total_length;
+    uint64_t remaining = chunk.data_length;
     uint8_t* data = chunk.data;
     uint64_t count = 0;
     while (remaining) {
