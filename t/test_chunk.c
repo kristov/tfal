@@ -186,11 +186,24 @@ void test_chunk_get_offset(test_harness_t* test) {
         0x01, //   1 bytes long
         0x07  //   data (7)
     };
-    uint32_t addr[2] = {1, 1};
     chunk_t chunk = chunk_decode(&data[0]);
-    uint64_t offset = chunk_byte_offset(chunk, &addr[0], 2);
+    uint64_t offset = 0;
 
-    is_equal_uint64(test, offset, 10, "test_chunk_get_offset(): offset correct");
+    uint32_t addra[2] = {1, 1};
+    offset = chunk_byte_offset(chunk, &addra[0], 2);
+    is_equal_uint64(test, offset, 10, "test_chunk_get_offset(): offset correct (expected)");
+
+    uint32_t addrb[2] = {1, 3};
+    offset = chunk_byte_offset(chunk, &addrb[0], 2);
+    is_equal_uint64(test, offset, 16, "test_chunk_get_offset(): offset correct (end of sub set)");
+
+    uint32_t addrc[2] = {2, 2};
+    offset = chunk_byte_offset(chunk, &addrc[0], 2);
+    is_equal_uint64(test, offset, 0, "test_chunk_get_offset(): offset zero (first level not a set)");
+
+    uint32_t addrd[2] = {1, 4};
+    offset = chunk_byte_offset(chunk, &addrd[0], 2);
+    is_equal_uint64(test, offset, 0, "test_chunk_get_offset(): offset zero (overflow second sub set)");
 }
 
 int main(int argc, char** argv) {
