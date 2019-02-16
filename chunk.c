@@ -121,8 +121,11 @@ uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx) {
                 return offset;
             }
             if (child.type == CHUNK_TYPE_SET) {
-                offset += chunk_byte_offset(child, idx, nr_idx);
-                return offset;
+                uint64_t child_offset = chunk_byte_offset(child, idx, nr_idx);
+                if (child_offset == 0) {
+                    return 0;
+                }
+                return offset + child_offset;
             }
         }
 
