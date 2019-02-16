@@ -64,6 +64,16 @@ const char* chunk_type_name(chunk_type_t type);
 uint8_t chunk_nr_length_bytes(uint64_t length);
 
 /**
+ * @brief Write a chunk header into a data address
+ *
+ * @param The destination for the header
+ * @param The chunk type
+ * @param The length of the data
+ * @return Start of the data contents
+ */
+uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length);
+
+/**
  * @brief Pack a chunk header into memory
  *
  * Takes a proto chunk and generates the header and length bytes.
@@ -71,7 +81,7 @@ uint8_t chunk_nr_length_bytes(uint64_t length);
  * @param start The destination for the header
  * @param chunk The chunk being packed
  */
-void chunk_make(uint8_t* start, chunk_t chunk);
+void chunk_make(uint8_t* data, chunk_t chunk);
 
 /**
  * @brief Decode memory into a chunk
@@ -101,12 +111,21 @@ uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth);
 /**
  * @brief Get the byte offset of an indexed item
  *
+ * @param Starting chunk set
+ * @param index
+ * @return Byte offset
+ */
+uint64_t chunk_set_item_byte_offset(chunk_t chunk, uint32_t idx);
+
+/**
+ * @brief Get the byte offset of an indexed item
+ *
  * @param Starting chunk address
  * @param List of 32 bit indexes
  * @param Number of indexes in that list
  * @return Byte offset
  */
-uint64_t chunk_byte_offset(chunk_t chunk, uint32_t* idx, uint32_t nr_idx);
+uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx);
 
 /**
  * @brief Get number of elements in set
