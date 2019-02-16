@@ -21,6 +21,7 @@ typedef enum chunk_type {
 } chunk_type_t;
 
 typedef struct chunk {
+    uint8_t* address;
     chunk_type_t type;
     uint8_t nr_length_bytes;
     uint64_t total_length;
@@ -99,6 +100,15 @@ uint8_t* chunk_make(uint8_t* data, chunk_t chunk);
 chunk_t chunk_decode(uint8_t* start);
 
 /**
+ * @brief Get the byte offset of an indexed item
+ *
+ * @param Starting chunk set
+ * @param index
+ * @return Byte offset
+ */
+uint64_t chunk_set_item_byte_offset(chunk_t chunk, uint32_t idx);
+
+/**
  * @brief Get the N'th element from a set
  *
  * Gets the zero-indexed N'th item in a set type. If the item was found it
@@ -108,16 +118,7 @@ chunk_t chunk_decode(uint8_t* start);
  * @param dest If found the chunk will be copied here
  * @return 1 or 0
  */
-uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth);
-
-/**
- * @brief Get the byte offset of an indexed item
- *
- * @param Starting chunk set
- * @param index
- * @return Byte offset
- */
-uint64_t chunk_set_item_byte_offset(chunk_t chunk, uint32_t idx);
+uint8_t chunk_set_get_nth(uint8_t* data, chunk_t* dest, uint64_t nth);
 
 /**
  * @brief Get the byte offset of an indexed item

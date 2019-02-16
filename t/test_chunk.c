@@ -114,15 +114,15 @@ void test_decode_complex(test_harness_t* test) {
     is_equal_uint8(test, chunk.type, CHUNK_TYPE_SET, "test_decode_complex(): chunk root is type CHUNK_TYPE_SET");
 
     chunk_t walk;
-    uint8_t found = chunk_set_get_nth(chunk, &walk, 2);
+    uint8_t found = chunk_set_get_nth(&data[0], &walk, 2);
     is_equal_uint8(test, found, 1, "test_decode_complex(): found the third element in set");
     is_equal_uint8(test, walk.type, CHUNK_TYPE_UINT16, "test_decode_complex(): third element in set is CHUNK_TYPE_UINT16");
 
-    found = chunk_set_get_nth(chunk, &walk, 1);
+    found = chunk_set_get_nth(&data[0], &walk, 1);
     is_equal_uint8(test, found, 1, "test_decode_complex(): found the second element in set");
     is_equal_uint8(test, walk.type, CHUNK_TYPE_SET, "test_decode_complex(): second element in set is CHUNK_TYPE_SET");
 
-    found = chunk_set_get_nth(walk, &walk, 2);
+    found = chunk_set_get_nth(walk.address, &walk, 2);
     is_equal_uint8(test, found, 1, "test_decode_complex(): found the third element in sub-set");
     is_equal_uint8(test, walk.type, CHUNK_TYPE_INT8, "test_decode_complex(): third element in sub-set is CHUNK_TYPE_INT8");
 }

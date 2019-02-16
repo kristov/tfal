@@ -77,6 +77,7 @@ chunk_t chunk_decode(uint8_t* start) {
     uint8_t head_byte = start[0];
 
     chunk_t chunk;
+    chunk.address = start;
     chunk.type = (head_byte & 0x0f);
     chunk.nr_length_bytes = ((head_byte >> 0x04) & 0x0f);
 
@@ -89,26 +90,6 @@ chunk_t chunk_decode(uint8_t* start) {
     chunk.total_length = 1 + chunk.nr_length_bytes + chunk.data_length;
     chunk.data = &start[index];
     return chunk;
-}
-
-uint8_t chunk_set_get_nth(chunk_t chunk, chunk_t* dest, uint64_t nth) {
-    if (chunk.type != CHUNK_TYPE_SET) {
-        return 0;
-    }
-    uint64_t remaining = chunk.data_length;
-    uint8_t* data = chunk.data;
-    uint64_t count = 0;
-    while (remaining) {
-        chunk_t child = chunk_decode(data);
-        if (count == nth) {
-            memcpy(dest, &child, sizeof(chunk_t));
-            return 1;
-        }
-        data = data + child.total_length;
-        remaining = remaining - child.total_length;
-        count++;
-    }
-    return 0;
 }
 
 uint64_t chunk_set_item_byte_offset(chunk_t chunk, uint32_t idx) {
@@ -134,6 +115,18 @@ uint64_t chunk_set_item_byte_offset(chunk_t chunk, uint32_t idx) {
     }
 
     return 0;
+}
+
+uint8_t chunk_set_get_nth(uint8_t* data, chunk_t* dest, uint64_t nth) {
+    chunk_t chunk = chunk_decode(data);
+    uint64_t offset = chunk_set_item_byte_offset(chunk, nth);
+    if (offset == 0) {
+        return 0;
+    }
+    data += offset;
+    chunk_t child = chunk_decode(data);
+    memcpy(dest, &child, sizeof(chunk_t));
+    return 1;
 }
 
 uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
