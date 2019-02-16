@@ -16,6 +16,7 @@ typedef enum chunk_type {
     CHUNK_TYPE_FLOAT32,
     CHUNK_TYPE_FLOAT64,
     CHUNK_TYPE_UTF8,
+    CHUNK_TYPE_REF,
     CHUNK_TYPE_SET
 } chunk_type_t;
 
@@ -80,8 +81,9 @@ uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length);
  *
  * @param start The destination for the header
  * @param chunk The chunk being packed
+ * @return Start of the data contents
  */
-void chunk_make(uint8_t* data, chunk_t chunk);
+uint8_t* chunk_make(uint8_t* data, chunk_t chunk);
 
 /**
  * @brief Decode memory into a chunk

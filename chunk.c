@@ -18,6 +18,7 @@ static uint8_t bytes_per_type[] = {
     0x04, // float32
     0x08, // float64
     0x01, // utf8
+    0x00, // ref (unknown)
     0x00, // set (unknown)
 };
 
@@ -34,6 +35,7 @@ static const char* name_per_type[] = {
     "float32",
     "float64",
     "utf8",
+    "ref",
     "set"
 };
 
@@ -66,8 +68,8 @@ uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length) {
     return data;
 }
 
-void chunk_make(uint8_t* data, chunk_t chunk) {
-    chunk_write_header(data, chunk.type, chunk.data_length);
+uint8_t* chunk_make(uint8_t* data, chunk_t chunk) {
+    return chunk_write_header(data, chunk.type, chunk.data_length);
 }
 
 chunk_t chunk_decode(uint8_t* start) {

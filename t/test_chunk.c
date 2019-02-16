@@ -6,9 +6,8 @@ void test_encode_simple(test_harness_t* test) {
     chunk_t chunk;
     uint8_t data[2];
 
-    chunk.total_length = 4;
+    chunk.data_length = 4;
     chunk.type = CHUNK_TYPE_UINT8;
-    chunk.nr_length_bytes = chunk_nr_length_bytes(chunk.total_length);
 
     chunk_make(&data[0], chunk);
 
@@ -20,9 +19,8 @@ void test_encode_long(test_harness_t* test) {
     chunk_t chunk;
     uint8_t data[3];
 
-    chunk.total_length = 256;
+    chunk.data_length = 256;
     chunk.type = CHUNK_TYPE_UINT8;
-    chunk.nr_length_bytes = chunk_nr_length_bytes(chunk.total_length);
 
     chunk_make(&data[0], chunk);
 
@@ -35,9 +33,8 @@ void test_encode_longer(test_harness_t* test) {
     chunk_t chunk;
     uint8_t data[6];
 
-    chunk.total_length = 16909060;
+    chunk.data_length = 16909060;
     chunk.type = CHUNK_TYPE_UINT8;
-    chunk.nr_length_bytes = chunk_nr_length_bytes(chunk.total_length);
 
     chunk_make(&data[0], chunk);
 
@@ -88,12 +85,12 @@ void test_decode_simple(test_harness_t* test) {
 
 void test_decode_complex(test_harness_t* test) {
     uint8_t data[] = {
-        0x1c, // 1 length byte, data type 12
+        0x1d, // 1 length byte, data type 12
         0x14, // 20 bytes long
         0x15, //   1 length byte, data type 5
         0x01, //   1 bytes long
         0x09, //   data (9)
-        0x1c, //   1 length byte, data type 12
+        0x1d, //   1 length byte, data type 12
         0x09, //   9 bytes long
         0x15, //     1 length byte, data type 5
         0x01, //     1 bytes long
@@ -132,7 +129,7 @@ void test_decode_complex(test_harness_t* test) {
 
 void test_chunk_get_offset_simple(test_harness_t* test) {
     uint8_t data[] = {
-        0x1c,
+        0x1d,
         0x06,
         0x15,
         0x01,
@@ -162,12 +159,12 @@ void test_chunk_get_offset_simple(test_harness_t* test) {
 
 void test_chunk_get_offset(test_harness_t* test) {
     uint8_t data[] = {
-        0x1c, // 1 length byte, data type 12
+        0x1d, // 1 length byte, data type 12
         0x14, // 20 bytes long
         0x15, //   1 length byte, data type 5
         0x01, //   1 bytes long
         0x09, //   data (9)
-        0x1c, //   1 length byte, data type 12
+        0x1d, //   1 length byte, data type 12
         0x09, //   9 bytes long
         0x15, //     1 length byte, data type 5
         0x01, //     1 bytes long
@@ -206,7 +203,7 @@ void test_chunk_get_offset(test_harness_t* test) {
 
 void test_chunk_set_item_byte_offset(test_harness_t* test) {
     uint8_t data[] = {
-        0x1c,
+        0x1d,
         0x06,
         0x15,
         0x01,
