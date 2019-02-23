@@ -53,6 +53,15 @@ uint8_t chunk_nr_length_bytes(uint64_t length) {
     return (uint8_t)(ans / 8) + 1;
 }
 
+uint8_t* chunk_write_length_bytes(uint8_t* data, uint8_t nr_length_bytes, uint64_t length) {
+    for (uint8_t i = 0; i < nr_length_bytes; i++) {
+        *data = 0x00;
+        *data = (length >> (0x08 * i));
+        data++;
+    }
+    return data;
+}
+
 uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length) {
     uint8_t nr_length_bytes = chunk_nr_length_bytes(length);
     uint8_t head = 0;
@@ -60,12 +69,7 @@ uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length) {
     head = (head & 0x0f) | ((nr_length_bytes & 0xf) << 4);
     *data = head;
     data++;
-    for (uint8_t i = 0; i < nr_length_bytes; i++) {
-        *data = 0x00;
-        *data = (length >> (0x08 * i));
-        data++;
-    }
-    return data;
+    return chunk_write_length_bytes(data, nr_length_bytes, length);
 }
 
 uint8_t* chunk_make(uint8_t* data, chunk_t chunk) {
@@ -149,6 +153,86 @@ uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
     }
     return offset + child_offset;
 }
+
+void foo(uint8_t* data, uint64_t length, uint32_t* idx, uint32_t nr_idx) {
+    chunk_move_t move;
+    chunk_lb_shift_t shifts[nr_idx];
+    chunk_lb_shift_t* shift;
+    uint32_t shift_idx = 0;
+
+    for (uint32_t addrx = nr_idx; addrx > 0; addrx--) {
+        uint64_t offset = chunk_byte_offset(data, idx, addrx);
+        if (offset == 0) {
+            return;
+        }
+        if (addrx == nr_idx) {
+            move.start = offset;
+            move.length = length;
+            continue;
+        }
+        shift = &shifts[shift_idx];
+
+        chunk_t chunk = chunk_decode(&data[offset]);
+        uint64_t new_data_length = chunk.data_length + length;
+        uint8_t new_nr_length_bytes = chunk_nr_length_bytes(new_data_length);
+        if (new_nr_length_bytes > chunk.nr_length_bytes) {
+            chunk_write_length_bytes(shift->length_bytes, new_nr_length_bytes, new_data_length);
+            shift->chunk_start = offset;
+            shift->length = new_nr_length_bytes - chunk.nr_length_bytes;
+            shift->nr_length_bytes = new_nr_length_bytes;
+            shift_idx++;
+            continue;
+        }
+    }
+
+    shift = &shifts[shift_idx];
+
+    chunk_t chunk = chunk_decode(data);
+    uint64_t new_data_length = chunk.data_length + length;
+    uint8_t new_nr_length_bytes = chunk_nr_length_bytes(new_data_length);
+    if (new_nr_length_bytes > chunk.nr_length_bytes) {
+        chunk_write_length_bytes(shift->length_bytes, new_nr_length_bytes, new_data_length);
+        shift->chunk_start = 0;
+        shift->length = new_nr_length_bytes - chunk.nr_length_bytes;
+        shift->nr_length_bytes = new_nr_length_bytes;
+    }
+
+    uint64_t total_shift = 0;
+    fprintf(stderr, "move.start: %lu\n", move.start);
+    fprintf(stderr, "move.length: %lu\n", move.length);
+    total_shift += move.length;
+    for (uint32_t i = 0; i < nr_idx; i++) {
+        chunk_lb_shift_t shift = shifts[i];
+        total_shift += shift.length;
+        fprintf(stderr, "[%d]\n", i);
+        fprintf(stderr, "  shift.chunk_start: %lu\n", shift.chunk_start);
+        fprintf(stderr, "  shift.length: %lu\n", shift.length);
+        fprintf(stderr, "  shift.nr_length_bytes: %d\n", shift.nr_length_bytes);
+    }
+    fprintf(stderr, "total_shift: %lu\n", total_shift);
+}
+
+/*
+void chunk_set_insert(chunk_insert_t* insert) {
+    chunk_t chunk = chunk_decode(insert->data);
+    if (chunk.type != CHUNK_TYPE_SET) {
+        return;
+    }
+    uint64_t offset = chunk_set_item_byte_offset(chunk, insert->location[insert->idx]);
+    if (offset == 0) {
+        return;
+    }
+    insert->idx++;
+    if (insert->idx == insert->depth) {
+        chunk_move_t* move = &insert->moves[insert->depth - insert->idx];
+        move->src = offset;
+        return;
+    }
+    insert->data += offset;
+    chunk_set_insert(insert);
+    return;
+}
+*/
 
 uint64_t chunk_set_nr_items(chunk_t chunk) {
     if (chunk.type != CHUNK_TYPE_SET) {

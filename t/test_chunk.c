@@ -228,6 +228,65 @@ void test_chunk_set_item_byte_offset(test_harness_t* test) {
     is_equal_uint64(test, offset, 0, "test_chunk_set_item_byte_offset(): offset zero (overflow)");
 }
 
+void test_chunk_set_insert_simple(test_harness_t* test) {
+/*
+    uint8_t data[] = {
+        0x1d,
+        0x06,
+        0x11,
+        0x01,
+        0x09,
+        0x00,
+        0x00,
+        0x00
+    };
+    chunk_move_t moves[1];
+    uint32_t location[1] = {1};
+
+    chunk_insert_t insert;
+    insert.data = &data[0];
+    insert.size = 3;
+    insert.location = &location[0];
+    insert.depth = 1;
+    insert.idx = 0;
+    insert.moves = &moves[0];
+
+    chunk_set_insert(&insert);
+
+    is_equal_uint64(test, insert.moves[0].src, 5, "test_chunk_insert_simple(): offset correct");
+*/
+}
+
+void test_chunk_set_insert(test_harness_t* test) {
+    uint8_t data[] = {
+        0x1d, // 1 length byte, data type 12
+        0x14, // 20 bytes long
+        0x15, //   1 length byte, data type 5
+        0x01, //   1 bytes long
+        0x09, //   data (9)
+        0x1d, //   1 length byte, data type 12 -- idx == 1
+        0x09, //   9 bytes long
+        0x15, //     1 length byte, data type 5
+        0x01, //     1 bytes long
+        0x09, //     data (9)
+        0x11, //     1 length byte, data type 1
+        0x01, //     1 bytes long
+        0x08, //     data (8)
+        0x12, //     1 length byte, data type 2
+        0x01, //     1 bytes long
+        0x07, //     data (7)
+        0x13, //   1 length byte, data type 3 -- idx == 3
+        0x01, //   1 bytes long
+        0x08, //   data (8)
+        0x12, //   1 length byte, data type 2
+        0x01, //   1 bytes long
+        0x07  //   data (7)
+    };
+    uint32_t location[2] = {1, 3};
+
+    foo(&data[0], 16777216, &location[0], 2);
+}
+
 int main(int argc, char** argv) {
     test_harness_t* test = test_harness_create();
     test->verbose = 1;
@@ -246,6 +305,9 @@ int main(int argc, char** argv) {
 
     test_chunk_get_offset_simple(test);
     test_chunk_get_offset(test);
+
+    test_chunk_set_insert_simple(test);
+    test_chunk_set_insert(test);
 
     test_harness_report(test);
     return 0;
