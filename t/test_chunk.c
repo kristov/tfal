@@ -4,7 +4,7 @@
 
 uint8_t TEST_STRUCTURE[] = {
     0x8d, // 8 length bytes, data type 12
-    0x14, // 20 bytes long
+    0x1b, // 27 bytes long
     0x00,
     0x00,
     0x00,
@@ -129,7 +129,7 @@ void test_decode_simple(test_harness_t* test) {
 void test_decode_complex(test_harness_t* test) {
     chunk_t chunk = chunk_decode(TEST_STRUCTURE);
 
-    is_equal_uint64(test, chunk.data_length, 20, "test_decode_complex(): chunk is 20 bytes long");
+    is_equal_uint64(test, chunk.data_length, 27, "test_decode_complex(): chunk is 20 bytes long");
     is_equal_uint8(test, chunk.type, CHUNK_TYPE_SET, "test_decode_complex(): chunk root is type CHUNK_TYPE_SET");
 
     chunk_t walk;
@@ -238,24 +238,25 @@ void test_chunk_set_item_byte_offset(test_harness_t* test) {
 }
 
 int main(int argc, char** argv) {
-    test_harness_t* test = test_harness_create();
-    test->verbose = 1;
+    test_harness_t test;
+    test_harness_init(&test);
+    test.verbose = 1;
 
-    test_decode_simple(test);
-    test_decode_longer(test);
-    test_decode_complex(test);
+    test_decode_simple(&test);
+    test_decode_longer(&test);
+    test_decode_complex(&test);
 
-    test_chunk_nr_length_bytes(test);
+    test_chunk_nr_length_bytes(&test);
 
-    test_encode_simple(test);
-    test_encode_long(test);
-    test_encode_longer(test);
+    test_encode_simple(&test);
+    test_encode_long(&test);
+    test_encode_longer(&test);
 
-    test_chunk_set_item_byte_offset(test);
+    test_chunk_set_item_byte_offset(&test);
 
-    test_chunk_get_offset_simple(test);
-    test_chunk_get_offset(test);
+    test_chunk_get_offset_simple(&test);
+    test_chunk_get_offset(&test);
 
-    test_harness_report(test);
+    test_harness_report(&test);
     return 0;
 }

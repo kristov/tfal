@@ -3,12 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-test_harness_t* test_harness_create() {
-    test_harness_t* test;
-    test = malloc(sizeof(test_harness_t));
-    return test;
-}
-
 void test_harness_report(test_harness_t* test) {
     fprintf(stderr, "Ran %d tests:\n", test->failures + test->passes);
     fprintf(stderr, "  %d Failures\n", test->failures);
@@ -117,4 +111,14 @@ void is_equal_float(test_harness_t* test, float provided, float desired, const c
         test->passes++;
         if (test->verbose) fprintf(stderr, "pass: %s\n", test_name);
     }
+}
+
+void test_harness_init(test_harness_t* test) {
+    memset(test, 0, sizeof(test_harness_t));
+}
+
+test_harness_t* test_harness_create() {
+    test_harness_t* test;
+    test = malloc(sizeof(test_harness_t));
+    return test;
 }

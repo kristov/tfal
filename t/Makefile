@@ -3,6 +3,7 @@ CFLAGS = -Wall -Werror -ggdb
 
 TESTS =
 TESTS += test_chunk.t
+TESTS += test_chunk_build.t
 
 all: test_harness.o $(TESTS)
 
