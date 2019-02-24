@@ -30,71 +30,6 @@ typedef struct chunk {
 } chunk_t;
 
 /**
- * @brief Memory move instruction
- *
- * A list of these is populated by chunk_insert(). Since the caller
- * knows the depth of the tree for the insert (chunk_insert_t: location
- * and depth) the caller is also responsible for creating a list of
- * empty chunk_move_t that chunk_insert() will fill with operations.
- * This list should always have at least 1 chunk_move_t populated (as
- * long as the location is valid) which is the move to make space for
- * the new inserted item. However additional moves may also be needed in
- * order to extend length bytes for parent set objects.
- *
- * The caller is responsible for iterating over this list and executing
- * the memory move operations according to the spec:
- *
- *   src:  The byte offset from the root where the data being moved
- *         starts.
- *   size: The size of the move, or how many bytes forward the block of
- *         memory should be shifted.
- *   data: A block of bytes of length move_size that will be written
- *         into the space between move_src and move_src + move_size.
- *
- * Note: the length of the block of memory being shifted is not provided
- * because it is always the total number of bytes from move_src to the
- * end of the root memory block, and should be known to the caller. An
- * example of using a list of moves in combination with memmove and
- * memcpy:
- *
- *   for (uint32_t i = 0; i < insert.depth; i++) {
- *       chunk_move_t move = insert.moves[i];
- *       uint64_t size = total_length - move.src;
- *       memmove(&dat[move.src + move.size], &dat[move.src], size);
- *       memcpy(&dat[move.src], move.data, move.size);
- *   }
- *
- */
-typedef struct chunk_move {
-    uint64_t start;
-    uint64_t length;
-} chunk_move_t;
-
-typedef struct chunk_lb_shift {
-    uint64_t chunk_start;
-    uint64_t length;
-    uint8_t nr_length_bytes;
-    uint8_t length_bytes[16];
-} chunk_lb_shift_t;
-
-/**
- * @brief Insert instruction
- *
- * This struct is used to tell chunk about a new data insert. You have
- * to make one of these structs before passing it to chunk_insert(). You
- * then inspect it afterwards for instructions on how to modify the data
- * structure in order to insert - a list of #chunk_move_t objects.
- */
-typedef struct chunk_insert {
-    uint8_t* data;
-    uint64_t size;
-    uint32_t* location;
-    uint32_t depth;
-    uint32_t idx;
-    chunk_move_t* moves;
-} chunk_insert_t;
-
-/**
  * @brief Number of bytes for a given type
  *
  * Returns the number of bytes for the type of the chunk.
@@ -189,15 +124,6 @@ uint8_t chunk_set_get_nth(uint8_t* data, chunk_t* dest, uint64_t nth);
  * @return Byte offset
  */
 uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx);
-
-void foo(uint8_t* data, uint64_t length, uint32_t* idx, uint32_t nr_idx);
-
-/**
- * @brief Build an insert instruction list
- *
- * @param Insert record to be populated
- */
-void chunk_set_insert(chunk_insert_t* insert);
 
 /**
  * @brief Get number of elements in set
