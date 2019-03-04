@@ -42,9 +42,9 @@ uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     return 0;
 }
 
-void draw_file() {
+void draw_file(const char* file) {
     uint8_t head[9];
-    int fd = open("test.hpd", O_RDONLY);
+    int fd = open(file, O_RDONLY);
 
     if (fd == -1) {
         printf("Error opening file\n");
@@ -100,7 +100,7 @@ void deinit() {
 
 int main(int argc, char* argv[]) {
     init();
-    draw_file();
+    draw_file("test.hpd");
     refresh();
     getch();
     deinit();
