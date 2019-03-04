@@ -79,22 +79,29 @@ uint8_t* chunk_make(uint8_t* data, chunk_t chunk) {
     return chunk_write_header(data, chunk.type, chunk.data_length);
 }
 
-chunk_t chunk_decode(uint8_t* start) {
-    uint64_t index = 1;
+chunk_t chunk_decode_head(uint8_t* start) {
     uint8_t head_byte = start[0];
-
     chunk_t chunk;
     chunk.address = start;
     chunk.type = (head_byte & 0x0f);
     chunk.nr_length_bytes = ((head_byte >> 0x04) & 0x0f);
-
     chunk.data_length = 0;
-    for (uint8_t i = 0; i < chunk.nr_length_bytes; i++) {
-        chunk.data_length |= (start[index] << (0x08 * i));
+    return chunk;
+}
+
+uint64_t chunk_calculate_length(uint8_t* start, chunk_t* chunk) {
+    uint64_t index = 1;
+    for (uint8_t i = 0; i < chunk->nr_length_bytes; i++) {
+        chunk->data_length |= (start[index] << (0x08 * i));
         index++;
     }
+    chunk->total_length = 1 + chunk->nr_length_bytes + chunk->data_length;
+    return index;
+}
 
-    chunk.total_length = 1 + chunk.nr_length_bytes + chunk.data_length;
+chunk_t chunk_decode(uint8_t* start) {
+    chunk_t chunk = chunk_decode_head(start);
+    uint64_t index = chunk_calculate_length(start, &chunk);
     chunk.data = &start[index];
     return chunk;
 }

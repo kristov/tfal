@@ -2,14 +2,14 @@ CC = gcc
 CFLAGS = -Wall -Werror -ggdb
 
 LD =
+LD += -lcurses
 OBJECTS =
-OBJECTS += ast.o
 OBJECTS += chunk.o
 
-all: test
+all: curses
 
-test: test.c $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $<
+curses: curses.c $(OBJECTS)
+	$(CC) $(CFLAGS) $(LD) -o $@ $(OBJECTS) $<
 
 chunk.o: LD = -lm
 
@@ -18,4 +18,4 @@ chunk.o: LD = -lm
 
 clean:
 	rm -f $(OBJECTS)
-	rm -f test
+	rm -f curses
