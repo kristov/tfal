@@ -34,17 +34,17 @@ typedef struct chunk {
  *
  * Returns the number of bytes for the type of the chunk.
  *
- * @param chunk A chunk
+ * @param chunk A chunk type
  * @return Number of bytes for that chunk type
  */
-uint8_t chunk_bytes_per_type(chunk_t chunk);
+uint8_t chunk_bytes_per_type(chunk_type_t type);
 
 /**
  * @brief Number of bytes for a given type
  *
  * Returns the number of bytes for the type of the chunk.
  *
- * @param chunk A chunk
+ * @param chunk A chunk type
  * @return Number of bytes for that chunk type
  */
 const char* chunk_type_name(chunk_type_t type);

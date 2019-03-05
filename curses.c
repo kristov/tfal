@@ -11,12 +11,15 @@
 #define CHUNK_COLOR_SET 1
 #define CHUNK_COLOR_ITEM 2
 
-typedef struct ccontext {
-    uint32_t cursor_depth;
-    uint32_t cursor_set_index;
-    uint32_t set_index;
-    uint32_t current_depth;
-} ccontext_t;
+typedef struct c_context {
+    int fd;
+    uint8_t* start;
+    uint32_t cursor_path[256];
+    uint8_t cursor_path_idx;
+    uint64_t cursor_byte_offset;
+} c_context_t;
+
+// uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
 
 static const char* name_per_type[] = {
     "X",
@@ -44,39 +47,41 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     }
 }
 
-void draw_set(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+void draw_set(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     attron(COLOR_PAIR(CHUNK_COLOR_SET));
     draw_box(xoff, yoff, 10, 1);
     mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
     attroff(COLOR_PAIR(CHUNK_COLOR_SET));
 }
 
-void draw_item(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+void draw_item(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
-    if (context->set_index == context->cursor_set_index && context->current_depth == context->cursor_depth) {
-        highlight = 2;
-    }
+    //if (context->set_index == context->cursor_set_index && context->current_depth == context->cursor_depth) {
+    //    highlight = 2;
+    //}
+    uint8_t bytes_per_type = chunk_bytes_per_type(chunk.type);
+    uint64_t nr_items = chunk.data_length / bytes_per_type;
     attron(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
     draw_box(xoff, yoff, 10, 1);
-    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
+    mvprintw(yoff, xoff, "%s:%lu", name_per_type[chunk.type], nr_items);
     attroff(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
 }
 
-uint8_t draw_chunk(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+uint8_t draw_chunk(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     if (chunk.type == CHUNK_TYPE_SET) {
         draw_set(context, chunk, xoff, yoff);
         uint8_t this_height = 1;
         uint64_t remaining = chunk.data_length;
         uint8_t* data = chunk.data;
-        context->set_index = 0;
+        //context->set_index = 0;
         while (remaining) {
             chunk_t child = chunk_decode(data);
-            context->current_depth++;
+            //context->current_depth++;
             this_height += draw_chunk(context, child, xoff + 1, yoff + this_height);
-            context->current_depth--;
+            //context->current_depth--;
             data = data + child.total_length;
             remaining = remaining - child.total_length;
-            context->set_index++;
+            //context->set_index++;
         }
         return this_height;
     }
@@ -85,7 +90,7 @@ uint8_t draw_chunk(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yof
     return 1;
 }
 
-void draw_file(ccontext_t* context, const char* file) {
+void load_file(c_context_t* context, const char* file) {
     uint8_t head[9];
     int fd = open(file, O_RDONLY);
 
@@ -103,22 +108,53 @@ void draw_file(ccontext_t* context, const char* file) {
     chunk_t chunk = chunk_decode(head);
 
     if (count < 9) {
+        close(fd);
         draw_chunk(context, chunk, 1, 0);
         return;
     }
 
     lseek(fd, 0, SEEK_SET);
-    uint8_t* start = mmap(0, chunk.total_length, PROT_READ, MAP_SHARED, fd, 0);
-    if (start == MAP_FAILED) {
+    context->start = mmap(0, chunk.total_length, PROT_READ, MAP_SHARED, fd, 0);
+    if (context->start == MAP_FAILED) {
         close(fd);
         mvprintw(0, 0, "mmap failed!");
         return;
     }
 
-    chunk = chunk_decode(start);
-    draw_chunk(context, chunk, 1, 1);
-    mvprintw(0, 0, "data_length: %lu", chunk.total_length);
+    context->fd = fd;
     return;
+}
+
+void loop(c_context_t* context) {
+    uint8_t running = 1;
+    uint8_t render = 1;
+    while (running) {
+        int c = getch();
+        switch (c) {
+            case KEY_UP:
+                render = 1;
+                break;
+            case KEY_RIGHT:
+                render = 1;
+                break;
+            default:
+                break;
+        }
+        if (render) {
+            chunk_t chunk = chunk_decode(context->start);
+            draw_chunk(context, chunk, 1, 1);
+            refresh();
+            render = 0;
+        }
+    }
+}
+
+void init_context(c_context_t* context) {
+    context->fd = -1;
+    //context->cursor_depth = 1;
+    //context->cursor_set_index = 0;
+    //context->set_index = 0;
+    //context->current_depth = 0;
 }
 
 void initcolors() {
@@ -137,26 +173,20 @@ void initcolors() {
 void init() {
     initscr();
     initcolors();
+    noecho();
+    keypad(stdscr, TRUE);
 }
 
 void deinit() {
     endwin();
 }
 
-void init_context(ccontext_t* context) {
-    context->cursor_depth = 1;
-    context->cursor_set_index = 0;
-    context->set_index = 0;
-    context->current_depth = 0;
-}
-
 int main(int argc, char* argv[]) {
     init();
-    ccontext_t context;
+    c_context_t context;
     init_context(&context);
-    draw_file(&context, "test.hpd");
-    refresh();
-    getch();
+    load_file(&context, "test.hpd");
+    loop(&context);
     deinit();
     return 1;
 }

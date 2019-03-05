@@ -5,46 +5,35 @@
 
 #include <stdio.h>
 
-static uint8_t bytes_per_type[] = {
-    0x00, // undef
-    0x01, // uint8
-    0x01, // int8
-    0x02, // uint16
-    0x02, // int16
-    0x04, // uint32
-    0x04, // int32
-    0x08, // uint64
-    0x08, // int64
-    0x04, // float32
-    0x08, // float64
-    0x01, // utf8
-    0x00, // ref (unknown)
-    0x00, // set (unknown)
-};
+typedef struct type_info {
+    uint8_t bytes_per_type;
+    uint8_t chars_decimal;
+    const char* name;
+} type_info_t;
 
-static const char* name_per_type[] = {
-    "[undef]",
-    "uint8",
-    "int8",
-    "uint16",
-    "int16",
-    "uint32",
-    "int32",
-    "uint64",
-    "int64",
-    "float32",
-    "float64",
-    "utf8",
-    "ref",
-    "set"
+static type_info_t info_types[] = {
+    {0x00, 0x00, "undef"},
+    {0x01, 0x03, "uint8"},
+    {0x01, 0x04, "int8"},
+    {0x02, 0x05, "uint16"},
+    {0x02, 0x06, "int16"},
+    {0x04, 0x0b, "uint32"},
+    {0x04, 0x0a, "int32"},
+    {0x08, 0x14, "uint64"},
+    {0x08, 0x14, "int64"},
+    {0x04, 0x00, "float32"},
+    {0x08, 0x00, "float64"},
+    {0x01, 0x01, "utf8"},
+    {0x00, 0x00, "ref"},
+    {0x00, 0x00, "set"}
 };
 
 const char* chunk_type_name(chunk_type_t type) {
-    return name_per_type[type];
+    return info_types[type].name;
 }
 
-uint8_t chunk_bytes_per_type(chunk_t chunk) {
-    return bytes_per_type[chunk.type];
+uint8_t chunk_bytes_per_type(chunk_type_t type) {
+    return info_types[type].bytes_per_type;
 }
 
 uint8_t chunk_nr_length_bytes(uint64_t length) {
