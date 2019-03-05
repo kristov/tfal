@@ -8,8 +8,13 @@
 #include <sys/mman.h>
 #include "chunk.h"
 
+#define CHUNK_COLOR_SET 1
+#define CHUNK_COLOR_ITEM 2
+
 typedef struct ccontext {
     uint32_t cursor_depth;
+    uint32_t cursor_set_index;
+    uint32_t set_index;
     uint32_t current_depth;
 } ccontext_t;
 
@@ -39,28 +44,45 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     }
 }
 
+void draw_set(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+    attron(COLOR_PAIR(CHUNK_COLOR_SET));
+    draw_box(xoff, yoff, 10, 1);
+    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
+    attroff(COLOR_PAIR(CHUNK_COLOR_SET));
+}
+
+void draw_item(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+    uint8_t highlight = 0;
+    if (context->set_index == context->cursor_set_index) {
+        highlight = 2;
+    }
+    attron(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
+    draw_box(xoff, yoff, 10, 1);
+    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
+    attroff(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
+}
+
 uint8_t draw_chunk(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     if (chunk.type == CHUNK_TYPE_SET) {
-        attron(COLOR_PAIR(1));
-        draw_box(xoff, yoff, 10, 1);
-        mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
-        attroff(COLOR_PAIR(1));
+        draw_set(context, chunk, xoff, yoff);
         uint8_t this_height = 1;
         uint64_t remaining = chunk.data_length;
         uint8_t* data = chunk.data;
+        uint32_t count = 0;
         while (remaining) {
             chunk_t child = chunk_decode(data);
+            context->current_depth++;
+            context->set_index = count;
             this_height += draw_chunk(context, child, xoff + 1, yoff + this_height);
+            context->current_depth--;
             data = data + child.total_length;
             remaining = remaining - child.total_length;
+            count++;
         }
         return this_height;
     }
 
-    attron(COLOR_PAIR(2));
-    draw_box(xoff, yoff, 10, 1);
-    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
-    attroff(COLOR_PAIR(2));
+    draw_item(context, chunk, xoff, yoff);
     return 1;
 }
 
@@ -109,6 +131,8 @@ void initcolors() {
     start_color();
     init_pair(1, COLOR_BLACK, COLOR_GREEN);
     init_pair(2, COLOR_BLACK, COLOR_BLUE);
+    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+    init_pair(4, COLOR_BLUE, COLOR_BLACK);
 }
 
 void init() {
@@ -120,9 +144,17 @@ void deinit() {
     endwin();
 }
 
+void init_context(ccontext_t* context) {
+    context->cursor_depth = 0;
+    context->cursor_set_index = 0;
+    context->set_index = 0;
+    context->current_depth = 0;
+}
+
 int main(int argc, char* argv[]) {
     init();
     ccontext_t context;
+    init_context(&context);
     context.cursor_depth = 0;
     draw_file(&context, "test.hpd");
     refresh();
