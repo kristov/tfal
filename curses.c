@@ -53,7 +53,7 @@ void draw_set(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
 
 void draw_item(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
-    if (context->set_index == context->cursor_set_index) {
+    if (context->set_index == context->cursor_set_index && context->current_depth == context->cursor_depth) {
         highlight = 2;
     }
     attron(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
@@ -68,16 +68,15 @@ uint8_t draw_chunk(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yof
         uint8_t this_height = 1;
         uint64_t remaining = chunk.data_length;
         uint8_t* data = chunk.data;
-        uint32_t count = 0;
+        context->set_index = 0;
         while (remaining) {
             chunk_t child = chunk_decode(data);
             context->current_depth++;
-            context->set_index = count;
             this_height += draw_chunk(context, child, xoff + 1, yoff + this_height);
             context->current_depth--;
             data = data + child.total_length;
             remaining = remaining - child.total_length;
-            count++;
+            context->set_index++;
         }
         return this_height;
     }
@@ -145,7 +144,7 @@ void deinit() {
 }
 
 void init_context(ccontext_t* context) {
-    context->cursor_depth = 0;
+    context->cursor_depth = 1;
     context->cursor_set_index = 0;
     context->set_index = 0;
     context->current_depth = 0;
@@ -155,7 +154,6 @@ int main(int argc, char* argv[]) {
     init();
     ccontext_t context;
     init_context(&context);
-    context.cursor_depth = 0;
     draw_file(&context, "test.hpd");
     refresh();
     getch();
