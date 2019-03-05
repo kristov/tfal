@@ -8,6 +8,23 @@
 #include <sys/mman.h>
 #include "chunk.h"
 
+static const char* name_per_type[] = {
+    "X",
+    "I",
+    "i",
+    "I",
+    "i",
+    "I",
+    "i",
+    "I",
+    "i",
+    "f",
+    "f",
+    "s",
+    "R",
+    "["
+};
+
 void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     uint8_t x, y;
     for (y = 0; y < h; y++) {
@@ -20,7 +37,8 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
 uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     if (chunk.type == CHUNK_TYPE_SET) {
         attron(COLOR_PAIR(1));
-        draw_box(xoff, yoff, 10, 2);
+        draw_box(xoff, yoff, 10, 1);
+        mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
         attroff(COLOR_PAIR(1));
         uint8_t this_height = 1;
         uint64_t remaining = chunk.data_length;
@@ -36,8 +54,8 @@ uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
 
     attron(COLOR_PAIR(2));
     draw_box(xoff, yoff, 10, 1);
+    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
     attroff(COLOR_PAIR(2));
-    mvprintw(yoff, xoff + 1, "[%s]", chunk_type_name(chunk.type));
     return 1;
 }
 
