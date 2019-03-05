@@ -8,38 +8,37 @@
 #include <sys/mman.h>
 #include "chunk.h"
 
-void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h, uint8_t c) {
-    attron(COLOR_PAIR(c));
+void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     uint8_t x, y;
     for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
-            mvaddch(y + yoff, x + xoff, ' ');
+            mvaddch(y + yoff, x + xoff, ACS_CKBOARD);
         }
     }
-    mvaddch(yoff, xoff, '[');
-    attroff(COLOR_PAIR(c));
 }
 
 uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     if (chunk.type == CHUNK_TYPE_SET) {
-        draw_box(xoff, yoff, 10, 2, 1);
-        yoff++;
+        attron(COLOR_PAIR(1));
+        draw_box(xoff, yoff, 10, 2);
+        attroff(COLOR_PAIR(1));
+        uint8_t this_height = 1;
         uint64_t remaining = chunk.data_length;
         uint8_t* data = chunk.data;
         while (remaining) {
             chunk_t child = chunk_decode(data);
-            yoff += draw_chunk(child, xoff + 1, yoff);
+            this_height += draw_chunk(child, xoff + 1, yoff + this_height);
             data = data + child.total_length;
             remaining = remaining - child.total_length;
         }
-        return yoff;
+        return this_height;
     }
-    else {
-        draw_box(xoff, yoff, 10, 1, 2);
-        mvprintw(yoff, xoff, "[%d]", chunk.type);
-        return 1;
-    }
-    return 0;
+
+    attron(COLOR_PAIR(2));
+    draw_box(xoff, yoff, 10, 1);
+    attroff(COLOR_PAIR(2));
+    mvprintw(yoff, xoff + 1, "[%s]", chunk_type_name(chunk.type));
+    return 1;
 }
 
 void draw_file(const char* file) {
