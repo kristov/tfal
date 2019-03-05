@@ -8,6 +8,11 @@
 #include <sys/mman.h>
 #include "chunk.h"
 
+typedef struct ccontext {
+    uint32_t cursor_depth;
+    uint32_t current_depth;
+} ccontext_t;
+
 static const char* name_per_type[] = {
     "X",
     "I",
@@ -34,7 +39,7 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     }
 }
 
-uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+uint8_t draw_chunk(ccontext_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     if (chunk.type == CHUNK_TYPE_SET) {
         attron(COLOR_PAIR(1));
         draw_box(xoff, yoff, 10, 1);
@@ -45,7 +50,7 @@ uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
         uint8_t* data = chunk.data;
         while (remaining) {
             chunk_t child = chunk_decode(data);
-            this_height += draw_chunk(child, xoff + 1, yoff + this_height);
+            this_height += draw_chunk(context, child, xoff + 1, yoff + this_height);
             data = data + child.total_length;
             remaining = remaining - child.total_length;
         }
@@ -59,7 +64,7 @@ uint8_t draw_chunk(chunk_t chunk, uint8_t xoff, uint8_t yoff) {
     return 1;
 }
 
-void draw_file(const char* file) {
+void draw_file(ccontext_t* context, const char* file) {
     uint8_t head[9];
     int fd = open(file, O_RDONLY);
 
@@ -77,7 +82,7 @@ void draw_file(const char* file) {
     chunk_t chunk = chunk_decode(head);
 
     if (count < 9) {
-        draw_chunk(chunk, 1, 0);
+        draw_chunk(context, chunk, 1, 0);
         return;
     }
 
@@ -90,7 +95,7 @@ void draw_file(const char* file) {
     }
 
     chunk = chunk_decode(start);
-    draw_chunk(chunk, 1, 1);
+    draw_chunk(context, chunk, 1, 1);
     mvprintw(0, 0, "data_length: %lu", chunk.total_length);
     return;
 }
@@ -117,7 +122,9 @@ void deinit() {
 
 int main(int argc, char* argv[]) {
     init();
-    draw_file("test.hpd");
+    ccontext_t context;
+    context.cursor_depth = 0;
+    draw_file(&context, "test.hpd");
     refresh();
     getch();
     deinit();
