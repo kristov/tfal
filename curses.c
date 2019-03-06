@@ -11,6 +11,39 @@
 #define CHUNK_COLOR_SET 1
 #define CHUNK_COLOR_ITEM 2
 
+//                   __ Item index 1 of the set, which is index 2 of the
+//                  /   root set.
+//                 /
+// S[I..I...S[I...I....I]]
+//
+// Keypad left does:
+//
+//   Decrements the cursor_path_idx. Regenerates cursor_byte_offset from the
+//   path.
+//
+// Keypad right does:
+//
+//   If the current object is a set:
+//     Increments cursor_path_idx and sets cursor_path[cursor_path_idx] to 0 if
+//     the current object. Regenerates cursor_byte_offset.
+//   If the current object is an item:
+//     Nothing yet, but could browse through data
+//
+// Keypad up:
+//   If cursor_path[cursor_path_idx-1] is a set:
+//     Decrement cursor_path[cursor_path_idx]. Do not decrement past zero.
+//     Regenerate cursor_byte_offset.
+//
+// Keypad down:
+//
+//   If cursor_path[cursor_path_idx-1] is a set:
+//     Increment cursor_path[cursor_path_idx]. Check parent set for end of set
+//     index condition. Regenerate cursor_byte_offset.
+//
+// When rendering:
+//   If cursor_byte_offset is equal to the start of the current chunk
+//   highlight it.
+//
 typedef struct c_context {
     int fd;
     uint8_t* start;
