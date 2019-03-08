@@ -4,6 +4,7 @@ CFLAGS = -Wall -Werror -ggdb
 LD =
 LD += -lcurses
 OBJECTS =
+OBJECTS += chunk_node.o
 OBJECTS += chunk.o
 
 all: curses

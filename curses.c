@@ -8,13 +8,14 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include "chunk.h"
+#include "chunk_node.h"
 
 #define CHUNK_COLOR_SET 1
 #define CHUNK_COLOR_ITEM 2
 
 typedef struct c_context {
     int fd;
-    uint8_t* start;
+    chunk_node_t* root;
     uint32_t cursor_path[256];
     uint8_t cursor_path_idx;
     uint64_t cursor_byte_offset;
@@ -49,49 +50,47 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     }
 }
 
-void draw_set(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
     if (context->current_byte_offset == context->cursor_byte_offset) {
         highlight = 2;
     }
     attron(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
     draw_box(xoff, yoff, 2, 1);
-    mvprintw(yoff, xoff, "%s", name_per_type[chunk.type]);
+    mvprintw(yoff, xoff, "%s", name_per_type[node->type]);
     attroff(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
 }
 
-void draw_item(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
+void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
     if (context->current_byte_offset == context->cursor_byte_offset) {
         highlight = 2;
     }
-    uint8_t bytes_per_type = chunk_bytes_per_type(chunk.type);
-    uint64_t nr_items = chunk.data_length / bytes_per_type;
+    uint8_t bytes_per_type = chunk_bytes_per_type(node->type);
+    uint64_t nr_items = node->data_length / bytes_per_type;
     attron(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
     draw_box(xoff, yoff, 3, 1);
-    mvprintw(yoff, xoff, "%s:%lu", name_per_type[chunk.type], nr_items);
+    mvprintw(yoff, xoff, "%s:%lu", name_per_type[node->type], nr_items);
     attroff(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
 }
 
-uint8_t draw_chunk(c_context_t* context, chunk_t chunk, uint8_t xoff, uint8_t yoff) {
-    if (chunk.type == CHUNK_TYPE_SET) {
-        draw_set(context, chunk, xoff, yoff);
+uint8_t draw_chunk_node(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    if (node->type == CHUNK_TYPE_SET) {
+        draw_set(context, node, xoff, yoff);
         uint8_t this_height = 1;
-        uint64_t remaining = chunk.data_length;
-        uint8_t* data = chunk.data;
-        context->current_byte_offset += (1 + chunk.nr_length_bytes);
-        while (remaining) {
-            chunk_t child = chunk_decode(data);
-            this_height += draw_chunk(context, child, xoff + 1, yoff + this_height);
-            data = data + child.total_length;
-            remaining = remaining - child.total_length;
+        for (uint64_t i = 0; i < node->nr_children; i++) {
+            chunk_node_t* child = &node->children[i];
+            this_height += draw_chunk_node(context, child, xoff + 1, yoff + this_height);
         }
         return this_height;
     }
 
-    draw_item(context, chunk, xoff, yoff);
-    context->current_byte_offset += chunk.total_length;
+    draw_item(context, node, xoff, yoff);
     return 1;
+}
+
+void draw(c_context_t* context, uint8_t xoff, uint8_t yoff) {
+    draw_chunk_node(context, context->root, xoff, yoff);
 }
 
 void load_file(c_context_t* context, const char* file) {
@@ -109,28 +108,30 @@ void load_file(c_context_t* context, const char* file) {
         return;
     }
 
-    chunk_t chunk = chunk_decode(head);
-
     if (count < 9) {
         close(fd);
-        draw_chunk(context, chunk, 1, 0);
+        context->root = chunk_node_build(head);
+        //draw_chunk(context, root, 1, 0);
         return;
     }
 
+    chunk_t chunk = chunk_decode(head);
+
     lseek(fd, 0, SEEK_SET);
-    context->start = mmap(0, chunk.total_length, PROT_READ, MAP_SHARED, fd, 0);
-    if (context->start == MAP_FAILED) {
+    uint8_t* start = mmap(0, chunk.total_length, PROT_READ, MAP_SHARED, fd, 0);
+    if (start == MAP_FAILED) {
         close(fd);
         mvprintw(0, 0, "mmap failed!");
         return;
     }
 
+    context->root = chunk_node_build(start);
     context->fd = fd;
     return;
 }
 
 void regenerate_cursor_offset(c_context_t* context) {
-    context->cursor_byte_offset = chunk_byte_offset(context->start, context->cursor_path, (uint32_t)context->cursor_path_idx + 1);
+    //context->cursor_byte_offset = chunk_byte_offset(context->start, context->cursor_path, (uint32_t)context->cursor_path_idx + 1);
     mvprintw(0, 0, "%lu   ", context->cursor_byte_offset);
 }
 
@@ -166,6 +167,7 @@ uint8_t key_left(c_context_t* context) {
 }
 
 uint8_t key_right(c_context_t* context) {
+/*
     chunk_t chunk = chunk_decode(context->start + context->cursor_byte_offset);
     if (chunk.type == CHUNK_TYPE_SET) {
         context->cursor_path_idx++;
@@ -173,6 +175,7 @@ uint8_t key_right(c_context_t* context) {
         regenerate_cursor_offset(context);
         return 1;
     }
+*/
     return 0;
 }
 
@@ -198,9 +201,7 @@ void loop(c_context_t* context) {
                 break;
         }
         if (render) {
-            chunk_t chunk = chunk_decode(context->start);
-            context->current_byte_offset = 0;
-            draw_chunk(context, chunk, 1, 1);
+            draw(context, 1, 1);
             refresh();
             render = 0;
         }

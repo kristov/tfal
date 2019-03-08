@@ -9,7 +9,7 @@ typedef struct chunk_node chunk_node_t;
 typedef struct chunk_node {
     chunk_type_t type;
     uint64_t data_length;
-    uint8_t nr_children;
+    uint64_t nr_children;
     chunk_node_t* children;
     uint8_t selected;
     uint8_t* start;
