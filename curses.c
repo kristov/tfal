@@ -16,10 +16,8 @@
 typedef struct c_context {
     int fd;
     chunk_node_t* root;
-    uint32_t cursor_path[256];
+    uint64_t cursor_path[256];
     uint8_t cursor_path_idx;
-    uint64_t cursor_byte_offset;
-    uint64_t current_byte_offset;
 } c_context_t;
 
 // uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
@@ -52,18 +50,18 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
 
 void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
-    if (context->current_byte_offset == context->cursor_byte_offset) {
+    if (node->selected) {
         highlight = 2;
     }
     attron(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
     draw_box(xoff, yoff, 2, 1);
-    mvprintw(yoff, xoff, "%s", name_per_type[node->type]);
+    mvprintw(yoff, xoff, "%s", name_per_type[13]);
     attroff(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
 }
 
 void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
-    if (context->current_byte_offset == context->cursor_byte_offset) {
+    if (node->selected) {
         highlight = 2;
     }
     uint8_t bytes_per_type = chunk_bytes_per_type(node->type);
@@ -111,7 +109,7 @@ void load_file(c_context_t* context, const char* file) {
     if (count < 9) {
         close(fd);
         context->root = chunk_node_build(head);
-        //draw_chunk(context, root, 1, 0);
+        draw(context, 1, 0);
         return;
     }
 
@@ -127,33 +125,44 @@ void load_file(c_context_t* context, const char* file) {
 
     context->root = chunk_node_build(start);
     context->fd = fd;
+    draw(context, 1, 1);
     return;
-}
-
-void regenerate_cursor_offset(c_context_t* context) {
-    //context->cursor_byte_offset = chunk_byte_offset(context->start, context->cursor_path, (uint32_t)context->cursor_path_idx + 1);
-    mvprintw(0, 0, "%lu   ", context->cursor_byte_offset);
 }
 
 uint8_t key_up(c_context_t* context) {
     if (context->cursor_path[context->cursor_path_idx] == 0) {
         return 0;
     }
+    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (prev == NULL) {
+        return 0;
+    }
+    prev->selected = 0;
     context->cursor_path[context->cursor_path_idx]--;
-    regenerate_cursor_offset(context);
+    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (next == NULL) {
+        context->cursor_path[context->cursor_path_idx]++;
+        prev->selected = 1;
+        return 0;
+    }
+    next->selected = 1;
     return 1;
 }
 
 uint8_t key_down(c_context_t* context) {
-    context->cursor_path[context->cursor_path_idx]++;
-    regenerate_cursor_offset(context);
-    // As I don't have an indication that the index exceeds the length of the
-    // set, looking for a zero here is an expensive way of backing off the end
-    // of the set.
-    if (context->cursor_byte_offset == 0) {
-        context->cursor_path[context->cursor_path_idx]--;
-        regenerate_cursor_offset(context);
+    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (prev == NULL) {
+        return 0;
     }
+    prev->selected = 0;
+    context->cursor_path[context->cursor_path_idx]++;
+    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (next == NULL) {
+        context->cursor_path[context->cursor_path_idx]--;
+        prev->selected = 1;
+        return 0;
+    }
+    next->selected = 1;
     return 1;
 }
 
@@ -161,22 +170,41 @@ uint8_t key_left(c_context_t* context) {
     if (context->cursor_path_idx == 0) {
         return 0;
     }
+    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (prev == NULL) {
+        return 0;
+    }
+    prev->selected = 0;
     context->cursor_path_idx--;
-    regenerate_cursor_offset(context);
+    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (next == NULL) {
+        context->cursor_path_idx++;
+        prev->selected = 1;
+        return 0;
+    }
+    next->selected = 1;
     return 1;
 }
 
 uint8_t key_right(c_context_t* context) {
-/*
-    chunk_t chunk = chunk_decode(context->start + context->cursor_byte_offset);
-    if (chunk.type == CHUNK_TYPE_SET) {
-        context->cursor_path_idx++;
-        context->cursor_path[context->cursor_path_idx] = 0;
-        regenerate_cursor_offset(context);
-        return 1;
+    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (prev == NULL) {
+        return 0;
     }
-*/
-    return 0;
+    if (prev->type != CHUNK_TYPE_SET) {
+        return 0;
+    }
+    prev->selected = 0;
+    context->cursor_path_idx++;
+    context->cursor_path[context->cursor_path_idx] = 0;
+    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (next == NULL) {
+        context->cursor_path_idx--;
+        prev->selected = 1;
+        return 0;
+    }
+    next->selected = 1;
+    return 1;
 }
 
 void loop(c_context_t* context) {
@@ -212,8 +240,6 @@ void init_context(c_context_t* context) {
     context->fd = -1;
     memset(context->cursor_path, 0, 256);
     context->cursor_path_idx = 0;
-    context->cursor_byte_offset = 0;
-    context->current_byte_offset = 0;
 }
 
 void initcolors() {
@@ -233,6 +259,7 @@ void init() {
     initscr();
     initcolors();
     noecho();
+    curs_set(0);
     keypad(stdscr, TRUE);
 }
 

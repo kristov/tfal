@@ -42,8 +42,19 @@ uint8_t TEST_STRUCTURE[] = {
 };
 
 void test_chunk_node_build(test_harness_t* test) {
-    chunk_node_t* node = chunk_node_build(TEST_STRUCTURE);
+    chunk_node_t* root = chunk_node_build(TEST_STRUCTURE);
+    chunk_node_t* node = root;
     is_equal_uint64(test, node->nr_children, 4, "test_chunk_node_build(): nr_children correct");
+    is_equal_uint8(test, node->children[0].type, 1, "test_chunk_node_build(): first child type corect");
+    is_equal_uint8(test, node->children[0].data_length, 1, "test_chunk_node_build(): first child data_length corect");
+
+    node = &node->children[1];
+    is_equal_uint64(test, node->nr_children, 3, "test_chunk_node_build(): nr_children correct");
+    is_equal_uint8(test, node->children[0].type, 1, "test_chunk_node_build(): first child type corect");
+    is_equal_uint8(test, node->children[0].data_length, 1, "test_chunk_node_build(): first child data_length corect");
+
+    is_equal_uint8(test, node->children[2].type, 2, "test_chunk_node_build(): first child type corect");
+    is_equal_uint8(test, node->children[2].data_length, 1, "test_chunk_node_build(): first child data_length corect");
 }
 
 int main(int argc, char** argv) {

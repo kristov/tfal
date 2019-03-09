@@ -14,19 +14,36 @@ void chunk_node_init(chunk_node_t* node, chunk_t chunk) {
     node->data_length = chunk.data_length;
 }
 
+chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_addr) {
+    if (node->type != CHUNK_TYPE_SET) {
+        return NULL;
+    }
+    if (addr[0] >= node->nr_children) {
+        return NULL;
+    }
+    chunk_node_t* child = &node->children[addr[0]];
+    nr_addr--;
+    if (nr_addr == 0) {
+        return child;
+    }
+    return chunk_node_select(child, &addr[1], nr_addr);
+}
+
 chunk_t chunk_node_construct(uint8_t* start, chunk_node_t* node) {
     chunk_t chunk = chunk_decode(start);
     chunk_node_init(node, chunk);
 
     if (chunk.type == CHUNK_TYPE_SET) {
         node->nr_children = chunk_set_nr_items(chunk);
-        node->children = malloc(sizeof(chunk_node_t) * node->nr_children);
-        memset(node->children, 0, sizeof(chunk_node_t) * node->nr_children);
-        uint64_t remaining = chunk.total_length;
+        size_t size = node->nr_children * sizeof(chunk_node_t);
+        node->children = (chunk_node_t*)malloc(size);
+        memset(node->children, 0, size);
+        uint64_t remaining = chunk.data_length;
         uint8_t* data = chunk.data;
+        uint64_t i = 0;
         while (remaining) {
-            chunk_t child = chunk_node_construct(data, node->children);
-            node->children++;
+            chunk_t child = chunk_node_construct(data, &node->children[i]);
+            i++;
             data = data + child.total_length;
             remaining = remaining - child.total_length;
         }
