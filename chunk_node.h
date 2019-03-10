@@ -8,12 +8,12 @@ typedef struct chunk_node chunk_node_t;
 
 typedef struct chunk_node {
     chunk_type_t type;
-    uint64_t data_length;
     uint64_t nr_children;
     chunk_node_t* children;
+    uint8_t bytes_per_type;
     uint8_t selected;
+    uint8_t* address;
     uint8_t* data;
-    uint64_t byte_offset;
 } chunk_node_t;
 
 chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_addr);

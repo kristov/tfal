@@ -9,9 +9,18 @@ chunk_node_t* chunk_node_make() {
     return node;
 }
 
-void chunk_node_init(chunk_node_t* node, chunk_t chunk) {
+void chunk_node_init(chunk_node_t* node, chunk_t chunk, uint8_t* start) {
     node->type = chunk.type;
-    node->data_length = chunk.data_length;
+    node->address = chunk.address;
+    node->data = chunk.data;
+    if (chunk.type == CHUNK_TYPE_SET) {
+        node->bytes_per_type = 0;
+        node->nr_children = chunk_set_nr_items(chunk);
+    }
+    else {
+        node->bytes_per_type = chunk_bytes_per_type(chunk.type);
+        node->nr_children = chunk.data_length / node->bytes_per_type;
+    }
 }
 
 chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_addr) {
@@ -31,7 +40,7 @@ chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_
 
 chunk_t chunk_node_construct(uint8_t* start, chunk_node_t* node) {
     chunk_t chunk = chunk_decode(start);
-    chunk_node_init(node, chunk);
+    chunk_node_init(node, chunk, start);
 
     if (chunk.type == CHUNK_TYPE_SET) {
         node->nr_children = chunk_set_nr_items(chunk);
