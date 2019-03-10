@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Werror -ggdb
 
 LD =
-LD += -lcurses
+LD += -lncursesw
 OBJECTS =
 OBJECTS += chunk_node.o
 OBJECTS += chunk.o

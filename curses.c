@@ -1,4 +1,4 @@
-#include <ncurses.h>
+#include <ncursesw/ncurses.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <locale.h>
+
 #include "chunk.h"
 #include "chunk_node.h"
 
@@ -76,6 +78,18 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
     attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
 }
 
+void draw_item_utf8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    attron(COLOR_PAIR(CHUNK_COLOR_DATA));
+    uint8_t str[256];
+    memcpy(str, node->data, 255);
+    str[255] = '\0';
+    if (node->nr_children < 255) {
+        str[node->nr_children] = '\0';
+    }
+    mvprintw(yoff, xoff, "%s", str);
+    attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
+}
+
 void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     switch (node->type) {
         case CHUNK_TYPE_UINT8:
@@ -101,6 +115,7 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
             draw_item_float64(context, node, xoff, yoff);
             break;
         case CHUNK_TYPE_UTF8:
+            draw_item_utf8(context, node, xoff, yoff);
             break;
         case CHUNK_TYPE_REF:
             break;
@@ -337,6 +352,7 @@ void deinit() {
 }
 
 int main(int argc, char* argv[]) {
+    setlocale(LC_ALL, "");
     init();
     c_context_t context;
     init_context(&context);
