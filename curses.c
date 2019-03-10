@@ -50,17 +50,6 @@ void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
     }
 }
 
-void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
-    uint8_t highlight = 0;
-    if (node->selected) {
-        highlight = 3;
-    }
-    attron(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
-    draw_box(xoff, yoff, 2, 1);
-    mvprintw(yoff, xoff, "%s:%lu", name_per_type[13], node->nr_children);
-    attroff(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
-}
-
 void draw_item_uint8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[4];
@@ -68,6 +57,19 @@ void draw_item_uint8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uin
     for (uint8_t i = 0; i < node->nr_children; i++) {
         uint8_t v = data[i];
         sprintf(num, "%u", v);
+        mvprintw(yoff, xoff, "%s", num);
+        xoff += strlen(num) + 1;
+    }
+    attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
+}
+
+void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    attron(COLOR_PAIR(CHUNK_COLOR_DATA));
+    char num[2048];
+    double* data = (double*)node->data;
+    for (uint8_t i = 0; i < node->nr_children; i++) {
+        double v = data[i];
+        sprintf(num, "%lf", v);
         mvprintw(yoff, xoff, "%s", num);
         xoff += strlen(num) + 1;
     }
@@ -96,6 +98,7 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
         case CHUNK_TYPE_FLOAT32:
             break;
         case CHUNK_TYPE_FLOAT64:
+            draw_item_float64(context, node, xoff, yoff);
             break;
         case CHUNK_TYPE_UTF8:
             break;
@@ -121,6 +124,17 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
     attroff(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
     uint8_t head_len = strlen(nr_children) + strlen(bytes_per_type) + 4;
     draw_item_data(context, node, xoff + head_len, yoff);
+}
+
+void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    uint8_t highlight = 0;
+    if (node->selected) {
+        highlight = 3;
+    }
+    attron(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
+    draw_box(xoff, yoff, 2, 1);
+    mvprintw(yoff, xoff, "%s:%lu", name_per_type[13], node->nr_children);
+    attroff(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
 }
 
 uint8_t draw_chunk_node(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
