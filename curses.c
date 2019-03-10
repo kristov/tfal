@@ -12,9 +12,7 @@
 #include "chunk.h"
 #include "chunk_node.h"
 
-#define CHUNK_COLOR_DATA 1
-#define CHUNK_COLOR_SET 2
-#define CHUNK_COLOR_ITEM 3
+#define CHUNK_COLOR_DATA 0x0e
 
 typedef struct c_context {
     int fd;
@@ -26,21 +24,21 @@ typedef struct c_context {
 
 // uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
 
-static const char* name_per_type[] = {
-    "X",
-    "I",
-    "i",
-    "I",
-    "i",
-    "I",
-    "i",
-    "I",
-    "i",
-    "f",
-    "f",
-    "s",
-    "R",
-    "["
+static const char name_per_type[] = {
+    'X',
+    'I',
+    'i',
+    'I',
+    'i',
+    'I',
+    'i',
+    'I',
+    'i',
+    'f',
+    'f',
+    's',
+    'R',
+    '['
 };
 
 void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
@@ -125,31 +123,30 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
 }
 
 void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
-    char nr_children[21];
-    char bytes_per_type[4];
-    sprintf(nr_children, "%lu", node->nr_children);
-    sprintf(bytes_per_type, "%u", node->bytes_per_type);
+    char head[24]; // I1:45265
+    memset(head, 0, 24);
+    sprintf(head, "%c%u:%lu", name_per_type[node->type], node->bytes_per_type, node->nr_children);
     uint8_t highlight = 0;
     if (node->selected) {
-        highlight = 3;
+        highlight = 0x10;
     }
-    attron(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
+    attron(COLOR_PAIR(node->type + highlight));
     draw_box(xoff, yoff, 3, 1);
-    mvprintw(yoff, xoff, "%s:%s:%s", name_per_type[node->type], nr_children, bytes_per_type);
-    attroff(COLOR_PAIR(CHUNK_COLOR_ITEM + highlight));
-    uint8_t head_len = strlen(nr_children) + strlen(bytes_per_type) + 4;
+    mvprintw(yoff, xoff, "%s", head);
+    attroff(COLOR_PAIR(node->type + highlight));
+    uint8_t head_len = strlen(head) + 1;
     draw_item_data(context, node, xoff + head_len, yoff);
 }
 
 void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
     if (node->selected) {
-        highlight = 3;
+        highlight = 0x10;
     }
-    attron(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
+    attron(COLOR_PAIR(node->type + highlight));
     draw_box(xoff, yoff, 2, 1);
-    mvprintw(yoff, xoff, "%s:%lu", name_per_type[13], node->nr_children);
-    attroff(COLOR_PAIR(CHUNK_COLOR_SET + highlight));
+    mvprintw(yoff, xoff, "%c:%lu", name_per_type[13], node->nr_children);
+    attroff(COLOR_PAIR(node->type + highlight));
 }
 
 uint8_t draw_chunk_node(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
@@ -329,14 +326,37 @@ void initcolors() {
         printf("Your terminal does not support color\n");
         exit(1);
     }
-    start_color();
-    init_pair(1, COLOR_WHITE, COLOR_BLACK);
-    init_pair(2, COLOR_GREEN, COLOR_BLACK);
-    init_pair(3, COLOR_BLUE, COLOR_BLACK);
 
-    init_pair(4, COLOR_BLACK, COLOR_WHITE);
-    init_pair(5, COLOR_BLACK, COLOR_GREEN);
-    init_pair(6, COLOR_BLACK, COLOR_BLUE);
+    start_color();
+    init_pair(0x01, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x02, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x03, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x04, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x05, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x06, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x07, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x08, COLOR_BLUE, COLOR_BLACK);
+    init_pair(0x09, COLOR_CYAN, COLOR_BLACK);
+    init_pair(0x0a, COLOR_CYAN, COLOR_BLACK);
+    init_pair(0x0b, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(0x0c, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(0x0d, COLOR_GREEN, COLOR_BLACK);
+    init_pair(0x0e, COLOR_WHITE, COLOR_BLACK);
+
+    init_pair(0x11, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x12, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x13, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x14, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x15, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x16, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x17, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x18, COLOR_BLACK, COLOR_BLUE);
+    init_pair(0x19, COLOR_BLACK, COLOR_CYAN);
+    init_pair(0x1a, COLOR_BLACK, COLOR_CYAN);
+    init_pair(0x1b, COLOR_BLACK, COLOR_MAGENTA);
+    init_pair(0x1c, COLOR_BLACK, COLOR_YELLOW);
+    init_pair(0x1d, COLOR_BLACK, COLOR_GREEN);
+    init_pair(0x1e, COLOR_BLACK, COLOR_WHITE);
 }
 
 void init() {
