@@ -14,15 +14,19 @@
 
 #define CHUNK_COLOR_DATA 0x0e
 
+typedef enum curses_mode {
+    CURSES_MODE_MOVE = 0x01,
+    CURSES_MODE_INSERT = 0x02
+} curses_mode_t;
+
 typedef struct c_context {
     int fd;
     chunk_node_t* root;
+    curses_mode_t mode;
     uint64_t cursor_path[256];
     uint8_t cursor_path_idx;
     uint8_t tabstop;
 } c_context_t;
-
-// uint64_t chunk_byte_offset(uint8_t* data, uint32_t* idx, uint32_t nr_idx) {
 
 static const char name_per_type[] = {
     'X',
@@ -284,23 +288,38 @@ uint8_t key_right(c_context_t* context) {
     return 1;
 }
 
+uint8_t handle_mode_move(c_context_t* context, int c) {
+    uint8_t render = 1;
+    switch (c) {
+        case KEY_UP:
+            render = key_up(context);
+            break;
+        case KEY_DOWN:
+            render = key_down(context);
+            break;
+        case KEY_LEFT:
+            render = key_left(context);
+            break;
+        case KEY_RIGHT:
+            render = key_right(context);
+            break;
+        case 'i':
+            context->mode = CURSES_MODE_INSERT;
+            break;
+        default:
+            break;
+    }
+    return render;
+}
+
 void loop(c_context_t* context) {
     uint8_t running = 1;
     uint8_t render = 1;
     while (running) {
         int c = getch();
-        switch (c) {
-            case KEY_UP:
-                render = key_up(context);
-                break;
-            case KEY_DOWN:
-                render = key_down(context);
-                break;
-            case KEY_LEFT:
-                render = key_left(context);
-                break;
-            case KEY_RIGHT:
-                render = key_right(context);
+        switch (context->mode) {
+            case CURSES_MODE_MOVE:
+                render = handle_mode_move(context, c);
                 break;
             default:
                 break;
@@ -316,6 +335,7 @@ void loop(c_context_t* context) {
 void init_context(c_context_t* context) {
     context->fd = -1;
     context->tabstop = 2;
+    context->mode = CURSES_MODE_MOVE;
     memset(context->cursor_path, 0, 256);
     context->cursor_path_idx = 0;
 }
