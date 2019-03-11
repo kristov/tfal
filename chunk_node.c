@@ -38,6 +38,22 @@ chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_
     return chunk_node_select(child, &addr[1], nr_addr);
 }
 
+void chunk_node_destroy_tree(chunk_node_t* node) {
+    if (node->type == CHUNK_TYPE_SET) {
+        for (uint64_t i = 0; i < node->nr_children; i++) {
+            chunk_node_t* child = &node->children[i];
+            chunk_node_destroy_tree(child);
+        }
+        free(node->children);
+        node->children = NULL;
+    }
+}
+
+void chunk_node_destroy(chunk_node_t* node) {
+    chunk_node_destroy_tree(node);
+    free(node);
+}
+
 chunk_t chunk_node_construct(uint8_t* start, chunk_node_t* node) {
     chunk_t chunk = chunk_decode(start);
     chunk_node_init(node, chunk, start);

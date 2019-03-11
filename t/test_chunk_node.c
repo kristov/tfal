@@ -69,6 +69,14 @@ void test_chunk_node_build(test_harness_t* test) {
 
     is_equal_uint8(test, node->children[3].type, 1, "test_chunk_node_build(): [3] type");
     is_equal_uint8(test, node->children[3].nr_children, 1, "test_chunk_node_build(): [3] nr_children");
+
+    chunk_node_destroy(root);
+}
+
+void test_chunk_node_add(test_harness_t* test) {
+    chunk_node_t* root = chunk_node_build(TEST_STRUCTURE);
+    chunk_node_t* node = root;
+
 }
 
 int main(int argc, char** argv) {
@@ -77,6 +85,7 @@ int main(int argc, char** argv) {
     test.verbose = 1;
 
     test_chunk_node_build(&test);
+    test_chunk_node_add(&test);
 
     test_harness_report(&test);
     return 0;

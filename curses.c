@@ -13,6 +13,7 @@
 #include "chunk_node.h"
 
 #define CHUNK_COLOR_DATA 0x0e
+#define CHUNK_COLOR_HIGHLIGHT 0x10
 
 typedef enum curses_mode {
     CURSES_MODE_MOVE = 0x01,
@@ -25,6 +26,7 @@ typedef struct c_context {
     curses_mode_t mode;
     uint64_t cursor_path[256];
     uint8_t cursor_path_idx;
+    uint64_t item_idx;
     uint8_t tabstop;
 } c_context_t;
 
@@ -58,11 +60,30 @@ void draw_item_uint8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uin
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[4];
     uint8_t* data = (uint8_t*)node->data;
-    for (uint8_t i = 0; i < node->nr_children; i++) {
-        uint8_t v = data[i];
-        sprintf(num, "%u", v);
-        mvprintw(yoff, xoff, "%s", num);
-        xoff += strlen(num) + 1;
+    if (node->selected) {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            uint8_t v = data[i];
+            sprintf(num, "%u", v);
+            if (i == context->item_idx) {
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                mvprintw(yoff, xoff, "%s", num);
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA));
+            }
+            else {
+                mvprintw(yoff, xoff, "%s", num);
+            }
+            xoff += strlen(num) + 1;
+        }
+    }
+    else {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            uint8_t v = data[i];
+            sprintf(num, "%u", v);
+            mvprintw(yoff, xoff, "%s", num);
+            xoff += strlen(num) + 1;
+        }
     }
     attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
 }
@@ -71,11 +92,30 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[2048];
     double* data = (double*)node->data;
-    for (uint8_t i = 0; i < node->nr_children; i++) {
-        double v = data[i];
-        sprintf(num, "%lf", v);
-        mvprintw(yoff, xoff, "%s", num);
-        xoff += strlen(num) + 1;
+    if (node->selected) {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            double v = data[i];
+            sprintf(num, "%lf", v);
+            if (i == context->item_idx) {
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                mvprintw(yoff, xoff, "%s", num);
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA));
+            }
+            else {
+                mvprintw(yoff, xoff, "%s", num);
+            }
+            xoff += strlen(num) + 1;
+        }
+    }
+    else {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            double v = data[i];
+            sprintf(num, "%lf", v);
+            mvprintw(yoff, xoff, "%s", num);
+            xoff += strlen(num) + 1;
+        }
     }
     attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
 }
@@ -132,7 +172,7 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
     sprintf(head, "%c%u:%lu", name_per_type[node->type], node->bytes_per_type, node->nr_children);
     uint8_t highlight = 0;
     if (node->selected) {
-        highlight = 0x10;
+        highlight = CHUNK_COLOR_HIGHLIGHT;
     }
     attron(COLOR_PAIR(node->type + highlight));
     draw_box(xoff, yoff, 3, 1);
@@ -145,7 +185,7 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
 void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
     if (node->selected) {
-        highlight = 0x10;
+        highlight = CHUNK_COLOR_HIGHLIGHT;
     }
     attron(COLOR_PAIR(node->type + highlight));
     draw_box(xoff, yoff, 2, 1);
@@ -247,20 +287,51 @@ uint8_t key_down(c_context_t* context) {
     return 1;
 }
 
+/*
+uint8_t key_left_item(c_context_t* context, chunk_node_t* curr) {
+}
+
+uint8_t key_left_set(c_context_t* context, chunk_node_t* curr) {
+}
+*/
+
 uint8_t key_left(c_context_t* context) {
     if (context->cursor_path_idx == 0) {
         return 0;
     }
-    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (prev == NULL) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
         return 0;
     }
-    prev->selected = 0;
+    curr->selected = 0;
     context->cursor_path_idx--;
     chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
     if (next == NULL) {
         context->cursor_path_idx++;
-        prev->selected = 1;
+        curr->selected = 1;
+        return 0;
+    }
+    next->selected = 1;
+    return 1;
+}
+
+uint8_t key_right_item(c_context_t* context, chunk_node_t* curr) {
+    if ((context->item_idx + 1) >= curr->nr_children) {
+        context->item_idx = 0;
+        return 1;
+    }
+    context->item_idx++;
+    return 1;
+}
+
+uint8_t key_right_set(c_context_t* context, chunk_node_t* curr) {
+    curr->selected = 0;
+    context->cursor_path_idx++;
+    context->cursor_path[context->cursor_path_idx] = 0;
+    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (next == NULL) {
+        context->cursor_path_idx--;
+        curr->selected = 1;
         return 0;
     }
     next->selected = 1;
@@ -268,24 +339,14 @@ uint8_t key_left(c_context_t* context) {
 }
 
 uint8_t key_right(c_context_t* context) {
-    chunk_node_t* prev = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (prev == NULL) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
         return 0;
     }
-    if (prev->type != CHUNK_TYPE_SET) {
-        return 0;
+    if (curr->type == CHUNK_TYPE_SET) {
+        return key_right_set(context, curr);
     }
-    prev->selected = 0;
-    context->cursor_path_idx++;
-    context->cursor_path[context->cursor_path_idx] = 0;
-    chunk_node_t* next = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (next == NULL) {
-        context->cursor_path_idx--;
-        prev->selected = 1;
-        return 0;
-    }
-    next->selected = 1;
-    return 1;
+    return key_right_item(context, curr);
 }
 
 uint8_t handle_mode_move(c_context_t* context, int c) {
@@ -338,6 +399,7 @@ void init_context(c_context_t* context) {
     context->mode = CURSES_MODE_MOVE;
     memset(context->cursor_path, 0, 256);
     context->cursor_path_idx = 0;
+    context->item_idx = 0;
 }
 
 void initcolors() {
