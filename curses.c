@@ -15,11 +15,6 @@
 #define CHUNK_COLOR_DATA 0x0e
 #define CHUNK_COLOR_HIGHLIGHT 0x10
 
-#define NODE_FLAG_FOCUS 0x00
-#define FLAG_SELECTED(n, f)  ((n->flags >> f) & 1)
-#define FLAG_SELECT(n, f)    (n->flags |= (1 << f))
-#define FLAG_UNSELECT(n, f)  (n->flags &= ~(1 << f))
-
 typedef enum curses_mode {
     CURSES_MODE_MOVE = 0x01,
     CURSES_MODE_INSERT = 0x02

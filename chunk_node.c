@@ -13,6 +13,7 @@ void chunk_node_init(chunk_node_t* node, chunk_t chunk, uint8_t* start) {
     node->type = chunk.type;
     node->address = chunk.address;
     node->data = chunk.data;
+    FLAG_SELECT(node, NODE_FLAG_REALISED);
     if (chunk.type == CHUNK_TYPE_SET) {
         node->bytes_per_type = 0;
         node->nr_children = chunk_set_nr_items(chunk);
@@ -36,6 +37,28 @@ chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_
         return child;
     }
     return chunk_node_select(child, &addr[1], nr_addr);
+}
+
+chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
+    if (node->type != CHUNK_TYPE_SET) {
+        return NULL;
+    }
+    if (location > node->nr_children) {
+        return NULL;
+    }
+    chunk_node_t* children_new = malloc(sizeof(chunk_node_t) * (node->nr_children + 1));
+
+    if (location == node->nr_children) {
+        memcpy(children_new, node->children, sizeof(chunk_node_t) * node->nr_children);
+    }
+    else {
+        memcpy(&children_new[location + 1], &node->children[location], sizeof(chunk_node_t) * (node->nr_children - location));
+    }
+    memset(&children_new[location], 0, sizeof(chunk_node_t));
+    free(node->children);
+    node->children = children_new;
+    node->nr_children++;
+    return &children_new[location];
 }
 
 void chunk_node_destroy_tree(chunk_node_t* node) {
