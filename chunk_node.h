@@ -4,11 +4,17 @@
 #include <stdint.h>
 #include "chunk.h"
 
+typedef struct chunk_node_data_change {
+    uint64_t insert_at;
+    uint8_t* data;
+    uint64_t nr_children;
+} chunk_node_data_change_t;
+
 typedef struct chunk_node chunk_node_t;
 
 typedef struct chunk_node {
     chunk_type_t type;
-    uint8_t selected;
+    uint8_t flags;
     uint8_t bytes_per_type;
     uint8_t* address;
     uint8_t* data;
