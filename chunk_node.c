@@ -52,6 +52,9 @@ chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
         memcpy(children_new, node->children, sizeof(chunk_node_t) * node->nr_children);
     }
     else {
+        if (location > 0) {
+            memcpy(&children_new[0], &node->children[0], sizeof(chunk_node_t) * location);
+        }
         memcpy(&children_new[location + 1], &node->children[location], sizeof(chunk_node_t) * (node->nr_children - location));
     }
     memset(&children_new[location], 0, sizeof(chunk_node_t));
