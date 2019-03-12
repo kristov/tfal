@@ -13,6 +13,7 @@
 #include "chunk_node.h"
 
 #define CHUNK_COLOR_DATA 0x0e
+#define CHUNK_COLOR_ERROR 0x0f
 #define CHUNK_COLOR_HIGHLIGHT 0x10
 
 typedef enum curses_mode {
@@ -31,7 +32,7 @@ typedef struct c_context {
 } c_context_t;
 
 static const char name_per_type[] = {
-    'X',
+    '?',
     'I',
     'i',
     'I',
@@ -167,17 +168,20 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
 }
 
 void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
-    char head[24]; // I1:45265
+    char head[24];
     memset(head, 0, 24);
     sprintf(head, "%c%u:%lu", name_per_type[node->type], node->bytes_per_type, node->nr_children);
-    uint8_t highlight = 0;
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
-        highlight = CHUNK_COLOR_HIGHLIGHT;
+    uint8_t color = node->type;
+    if (node->type == 0) {
+        color = CHUNK_COLOR_ERROR;
     }
-    attron(COLOR_PAIR(node->type + highlight));
+    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+        color += CHUNK_COLOR_HIGHLIGHT;
+    }
+    attron(COLOR_PAIR(color));
     draw_box(xoff, yoff, 3, 1);
     mvprintw(yoff, xoff, "%s", head);
-    attroff(COLOR_PAIR(node->type + highlight));
+    attroff(COLOR_PAIR(color));
     uint8_t head_len = strlen(head) + 1;
     draw_item_data(context, node, xoff + head_len, yoff);
 }
@@ -346,6 +350,39 @@ uint8_t key_right(c_context_t* context) {
     return key_right_item(context, curr);
 }
 
+uint8_t key_insert_append(c_context_t* context, uint64_t at) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
+        return 0;
+    }
+
+    chunk_node_t* parent = chunk_node_select(context->root, &context->cursor_path[context->cursor_path_idx - 1], context->cursor_path_idx);
+    if (parent == NULL) {
+        return 0;
+    }
+    if (parent->type != CHUNK_TYPE_SET) {
+        return 0;
+    }
+
+    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
+    chunk_node_t* new = chunk_node_set_insert(parent, at);
+    if (new == NULL) {
+        FLAG_SELECT(curr, NODE_FLAG_FOCUS);
+        return 0;
+    }
+    context->cursor_path[context->cursor_path_idx] = at;
+    FLAG_SELECT(new, NODE_FLAG_FOCUS);
+    return 1;
+}
+
+uint8_t key_insert(c_context_t* context) {
+    return key_insert_append(context, context->cursor_path[context->cursor_path_idx]);
+}
+
+uint8_t key_append(c_context_t* context) {
+    return key_insert_append(context, context->cursor_path[context->cursor_path_idx] + 1);
+}
+
 uint8_t handle_mode_move(c_context_t* context, int c) {
     uint8_t render = 1;
     switch (c) {
@@ -362,7 +399,10 @@ uint8_t handle_mode_move(c_context_t* context, int c) {
             render = key_right(context);
             break;
         case 'i':
-            context->mode = CURSES_MODE_INSERT;
+            render = key_insert(context);
+            break;
+        case 'a':
+            render = key_append(context);
             break;
         default:
             break;
@@ -383,6 +423,7 @@ void loop(c_context_t* context) {
                 break;
         }
         if (render) {
+            clear();
             draw(context, 1, 1);
             refresh();
             render = 0;
@@ -421,6 +462,7 @@ void initcolors() {
     init_pair(0x0c, COLOR_YELLOW, COLOR_BLACK);
     init_pair(0x0d, COLOR_GREEN, COLOR_BLACK);
     init_pair(0x0e, COLOR_WHITE, COLOR_BLACK);
+    init_pair(0x0f, COLOR_RED, COLOR_BLACK);
 
     init_pair(0x11, COLOR_BLACK, COLOR_BLUE);
     init_pair(0x12, COLOR_BLACK, COLOR_BLUE);
@@ -436,6 +478,7 @@ void initcolors() {
     init_pair(0x1c, COLOR_BLACK, COLOR_YELLOW);
     init_pair(0x1d, COLOR_BLACK, COLOR_GREEN);
     init_pair(0x1e, COLOR_BLACK, COLOR_WHITE);
+    init_pair(0x1f, COLOR_BLACK, COLOR_RED);
 }
 
 void init() {
