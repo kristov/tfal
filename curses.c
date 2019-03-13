@@ -18,7 +18,7 @@
 
 typedef enum curses_mode {
     CURSES_MODE_MOVE = 0x01,
-    CURSES_MODE_INSERT = 0x02
+    CURSES_MODE_TYPE = 0x02
 } curses_mode_t;
 
 typedef struct c_context {
@@ -122,6 +122,9 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
 }
 
 void draw_item_utf8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    if (node->nr_children == 0) {
+        return;
+    }
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     uint8_t str[256];
     memcpy(str, node->data, 255);
@@ -290,20 +293,8 @@ uint8_t key_down(c_context_t* context) {
     return 1;
 }
 
-/*
-uint8_t key_left_item(c_context_t* context, chunk_node_t* curr) {
-}
-
 uint8_t key_left_set(c_context_t* context, chunk_node_t* curr) {
-}
-*/
-
-uint8_t key_left(c_context_t* context) {
     if (context->cursor_path_idx == 0) {
-        return 0;
-    }
-    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (curr == NULL) {
         return 0;
     }
     context->cursor_path_idx--;
@@ -317,13 +308,23 @@ uint8_t key_left(c_context_t* context) {
     return 1;
 }
 
-uint8_t key_right_item(c_context_t* context, chunk_node_t* curr) {
-    if ((context->item_idx + 1) >= curr->nr_children) {
-        context->item_idx = 0;
-        return 1;
+uint8_t key_left_item(c_context_t* context, chunk_node_t* curr) {
+    if (context->item_idx == 0) {
+        return key_left_set(context, curr);
     }
-    context->item_idx++;
+    context->item_idx--;
     return 1;
+}
+
+uint8_t key_left(c_context_t* context) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
+        return 0;
+    }
+    if (curr->type == CHUNK_TYPE_SET) {
+        return key_left_set(context, curr);
+    }
+    return key_left_item(context, curr);
 }
 
 uint8_t key_right_set(c_context_t* context, chunk_node_t* curr) {
@@ -336,6 +337,15 @@ uint8_t key_right_set(c_context_t* context, chunk_node_t* curr) {
     }
     FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
     FLAG_SELECT(next, NODE_FLAG_FOCUS);
+    return 1;
+}
+
+uint8_t key_right_item(c_context_t* context, chunk_node_t* curr) {
+    if ((context->item_idx + 1) >= curr->nr_children) {
+        context->item_idx = 0;
+        return 1;
+    }
+    context->item_idx++;
     return 1;
 }
 
@@ -356,8 +366,15 @@ uint8_t key_insert_append(c_context_t* context, uint64_t at) {
         return 0;
     }
 
-    chunk_node_t* parent = chunk_node_select(context->root, &context->cursor_path[context->cursor_path_idx - 1], context->cursor_path_idx);
+    chunk_node_t* parent = NULL;
+    if (context->cursor_path_idx == 0) {
+        parent = context->root;
+    }
+    else {
+        parent = chunk_node_select(context->root, &context->cursor_path[context->cursor_path_idx - 1], context->cursor_path_idx);
+    }
     if (parent == NULL) {
+        mvprintw(0, 0, "parent element NULL, curr->type: %d", curr->type);
         return 0;
     }
     if (parent->type != CHUNK_TYPE_SET) {
@@ -372,6 +389,7 @@ uint8_t key_insert_append(c_context_t* context, uint64_t at) {
     }
     context->cursor_path[context->cursor_path_idx] = at;
     FLAG_SELECT(new, NODE_FLAG_FOCUS);
+    context->mode = CURSES_MODE_TYPE;
     return 1;
 }
 
@@ -381,6 +399,24 @@ uint8_t key_insert(c_context_t* context) {
 
 uint8_t key_append(c_context_t* context) {
     return key_insert_append(context, context->cursor_path[context->cursor_path_idx] + 1);
+}
+
+uint8_t key_set_type(c_context_t* context, chunk_type_t type, uint8_t bytes_per_type) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
+        return 0;
+    }
+    if (FLAG_SELECTED(curr, NODE_FLAG_REALISED)) {
+        mvprintw(0, 0, "can not change type of realised item");
+        return 0;
+    }
+    if (curr->type == 0x00) {
+        curr->type = type;
+        curr->bytes_per_type = bytes_per_type;
+        return 1;
+    }
+    // Convert existing data to new type if any
+    return 1;
 }
 
 uint8_t handle_mode_move(c_context_t* context, int c) {
@@ -410,6 +446,37 @@ uint8_t handle_mode_move(c_context_t* context, int c) {
     return render;
 }
 
+uint8_t handle_mode_type(c_context_t* context, int c) {
+    uint8_t render = 1;
+    switch (c) {
+        case '[':
+            break;
+        case 'I':
+            break;
+        case 'i':
+            break;
+        case 'f':
+            break;
+        case 's':
+            render = key_set_type(context, CHUNK_TYPE_UTF8, 1);
+            context->mode = CURSES_MODE_MOVE;
+            break;
+        case 'R':
+            break;
+        case '1':
+            break;
+        case '2':
+            break;
+        case '4':
+            break;
+        case '8':
+            break;
+        default:
+            break;
+    }
+    return render;
+}
+
 void loop(c_context_t* context) {
     uint8_t running = 1;
     uint8_t render = 1;
@@ -419,6 +486,8 @@ void loop(c_context_t* context) {
             case CURSES_MODE_MOVE:
                 render = handle_mode_move(context, c);
                 break;
+            case CURSES_MODE_TYPE:
+                render = handle_mode_type(context, c);
             default:
                 break;
         }
