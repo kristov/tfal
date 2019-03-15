@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "chunk_node.h"
 #include "chunk.h"
+#include "utf8.h"
 
 chunk_node_t* chunk_node_make() {
     chunk_node_t* node = malloc(sizeof(chunk_node_t));
@@ -13,14 +14,18 @@ void chunk_node_init(chunk_node_t* node, chunk_t chunk, uint8_t* start) {
     node->type = chunk.type;
     node->address = chunk.address;
     node->data = chunk.data;
+    node->data_length = chunk.data_length;
     FLAG_SELECT(node, NODE_FLAG_REALISED);
-    if (chunk.type == CHUNK_TYPE_SET) {
-        node->bytes_per_type = 0;
-        node->nr_children = chunk_set_nr_items(chunk);
-    }
-    else {
-        node->bytes_per_type = chunk_bytes_per_type(chunk.type);
-        node->nr_children = chunk.data_length / node->bytes_per_type;
+    switch (chunk.type) {
+        case CHUNK_TYPE_SET:
+            node->nr_children = chunk_set_nr_items(chunk);
+            break;
+        case CHUNK_TYPE_UTF8:
+            node->nr_children = u8_strlen((char*)chunk.data);
+            break;
+        default:
+            node->nr_children = chunk.data_length / chunk_bytes_per_type(node->type);
+            break;
     }
 }
 
@@ -64,6 +69,14 @@ chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
     return &children_new[location];
 }
 
+void chunk_node_load_data_unrealise(chunk_node_t* node) {
+    uint64_t bytes_to_load = chunk_bytes_per_type(node->type) * node->nr_children;
+    uint8_t* loaded_data = malloc(bytes_to_load);
+    memcpy(loaded_data, node->data, bytes_to_load);
+    node->data = loaded_data;
+    FLAG_UNSELECT(node, NODE_FLAG_REALISED);
+}
+
 void chunk_node_destroy_tree(chunk_node_t* node) {
     if (node->type == CHUNK_TYPE_SET) {
         for (uint64_t i = 0; i < node->nr_children; i++) {
@@ -72,6 +85,10 @@ void chunk_node_destroy_tree(chunk_node_t* node) {
         }
         free(node->children);
         node->children = NULL;
+        return;
+    }
+    if (!FLAG_SELECTED(node, NODE_FLAG_REALISED)) {
+        free(node->data);
     }
 }
 

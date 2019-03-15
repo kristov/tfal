@@ -4,6 +4,7 @@ CFLAGS = -Wall -Werror -ggdb
 LD =
 LD += -lncursesw
 OBJECTS =
+OBJECTS += utf8.o
 OBJECTS += chunk_node.o
 OBJECTS += chunk.o
 

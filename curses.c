@@ -11,9 +11,11 @@
 
 #include "chunk.h"
 #include "chunk_node.h"
+#include "utf8.h"
 
 #define CHUNK_COLOR_DATA 0x0e
 #define CHUNK_COLOR_ERROR 0x0f
+#define CHUNK_COLOR_WARN 0x10
 #define CHUNK_COLOR_HIGHLIGHT 0x10
 
 typedef enum curses_mode {
@@ -29,6 +31,8 @@ typedef struct c_context {
     uint8_t cursor_path_idx;
     uint64_t item_idx;
     uint8_t tabstop;
+    uint8_t cmd_buf[256];
+    uint8_t cmd_buf_idx;
 } c_context_t;
 
 static const char name_per_type[] = {
@@ -90,12 +94,13 @@ void draw_item_uint8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uin
 }
 
 void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
+    double v = 0;
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[2048];
     double* data = (double*)node->data;
     if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
         for (uint8_t i = 0; i < node->nr_children; i++) {
-            double v = data[i];
+            v = data[i];
             sprintf(num, "%lf", v);
             if (i == context->item_idx) {
                 attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
@@ -112,7 +117,7 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
     }
     else {
         for (uint8_t i = 0; i < node->nr_children; i++) {
-            double v = data[i];
+            v = data[i];
             sprintf(num, "%lf", v);
             mvprintw(yoff, xoff, "%s", num);
             xoff += strlen(num) + 1;
@@ -122,17 +127,35 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
 }
 
 void draw_item_utf8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
-    if (node->nr_children == 0) {
-        return;
-    }
+    int cn = 0;
+    uint32_t next[2];
+    char* s = (char*)node->data;
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
-    uint8_t str[256];
-    memcpy(str, node->data, 255);
-    str[255] = '\0';
-    if (node->nr_children < 255) {
-        str[node->nr_children] = '\0';
+    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            next[0] = u8_nextchar(s, &cn);
+            next[1] = 0;
+            if (i == context->item_idx) {
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                mvprintw(yoff, xoff, "%S", next);
+                attroff(COLOR_PAIR(CHUNK_COLOR_DATA + CHUNK_COLOR_HIGHLIGHT));
+                attron(COLOR_PAIR(CHUNK_COLOR_DATA));
+            }
+            else {
+                mvprintw(yoff, xoff, "%S", next);
+            }
+            xoff += 1;
+        }
     }
-    mvprintw(yoff, xoff, "%s", str);
+    else {
+        for (uint8_t i = 0; i < node->nr_children; i++) {
+            next[0] = u8_nextchar(s, &cn);
+            next[1] = 0;
+            mvprintw(yoff, xoff, "%S", next);
+            xoff += 1;
+        }
+    }
     attroff(COLOR_PAIR(CHUNK_COLOR_DATA));
 }
 
@@ -173,7 +196,7 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
 void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     char head[24];
     memset(head, 0, 24);
-    sprintf(head, "%c%u:%lu", name_per_type[node->type], node->bytes_per_type, node->nr_children);
+    sprintf(head, "%c%u:%lu", name_per_type[node->type], chunk_bytes_per_type(node->type), node->nr_children);
     uint8_t color = node->type;
     if (node->type == 0) {
         color = CHUNK_COLOR_ERROR;
@@ -185,8 +208,13 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
     draw_box(xoff, yoff, 3, 1);
     mvprintw(yoff, xoff, "%s", head);
     attroff(COLOR_PAIR(color));
-    uint8_t head_len = strlen(head) + 1;
-    draw_item_data(context, node, xoff + head_len, yoff);
+    uint8_t head_len = strlen(head);
+    if (!FLAG_SELECTED(node, NODE_FLAG_REALISED)) {
+        attron(COLOR_PAIR(CHUNK_COLOR_WARN));
+        mvprintw(yoff, xoff + head_len, "*");
+        attroff(COLOR_PAIR(CHUNK_COLOR_WARN));
+    }
+    draw_item_data(context, node, xoff + head_len + 1, yoff);
 }
 
 void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
@@ -401,7 +429,32 @@ uint8_t key_append(c_context_t* context) {
     return key_insert_append(context, context->cursor_path[context->cursor_path_idx] + 1);
 }
 
-uint8_t key_set_type(c_context_t* context, chunk_type_t type, uint8_t bytes_per_type) {
+uint8_t key_insert_append_item(c_context_t* context, uint64_t at) {
+    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
+    if (curr == NULL) {
+        return 0;
+    }
+
+    if (curr->type == CHUNK_TYPE_SET) {
+        return 0;
+    }
+
+    if (FLAG_SELECTED(curr, NODE_FLAG_REALISED)) {
+        chunk_node_load_data_unrealise(curr);
+    }
+
+    return 1;
+}
+
+uint8_t key_insert_item(c_context_t* context) {
+    return key_insert_append_item(context, context->item_idx);
+}
+
+uint8_t key_append_item(c_context_t* context) {
+    return key_insert_append_item(context, context->item_idx + 1);
+}
+
+uint8_t key_set_type(c_context_t* context, chunk_type_t type) {
     chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
     if (curr == NULL) {
         return 0;
@@ -412,7 +465,6 @@ uint8_t key_set_type(c_context_t* context, chunk_type_t type, uint8_t bytes_per_
     }
     if (curr->type == 0x00) {
         curr->type = type;
-        curr->bytes_per_type = bytes_per_type;
         return 1;
     }
     // Convert existing data to new type if any
@@ -440,6 +492,12 @@ uint8_t handle_mode_move(c_context_t* context, int c) {
         case 'a':
             render = key_append(context);
             break;
+        case 'I':
+            render = key_insert_item(context);
+            break;
+        case 'A':
+            render = key_append_item(context);
+            break;
         default:
             break;
     }
@@ -450,26 +508,81 @@ uint8_t handle_mode_type(c_context_t* context, int c) {
     uint8_t render = 1;
     switch (c) {
         case '[':
+            render = key_set_type(context, CHUNK_TYPE_SET);
             break;
         case 'I':
+            context->cmd_buf[0] = 0x01;
             break;
         case 'i':
+            context->cmd_buf[0] = 0x02;
             break;
         case 'f':
+            context->cmd_buf[0] = 0x03;
             break;
         case 's':
-            render = key_set_type(context, CHUNK_TYPE_UTF8, 1);
+            render = key_set_type(context, CHUNK_TYPE_UTF8);
             context->mode = CURSES_MODE_MOVE;
             break;
         case 'R':
+            render = key_set_type(context, CHUNK_TYPE_REF);
             break;
         case '1':
+            switch (context->cmd_buf[0]) {
+                case 0x01:
+                    render = key_set_type(context, CHUNK_TYPE_UINT8);
+                    break;
+                case 0x02:
+                    render = key_set_type(context, CHUNK_TYPE_INT8);
+                    break;
+                default:
+                    break;
+            }
+            context->mode = CURSES_MODE_MOVE;
             break;
         case '2':
+            switch (context->cmd_buf[0]) {
+                case 0x01:
+                    render = key_set_type(context, CHUNK_TYPE_UINT16);
+                    break;
+                case 0x02:
+                    render = key_set_type(context, CHUNK_TYPE_INT16);
+                    break;
+                default:
+                    break;
+            }
+            context->mode = CURSES_MODE_MOVE;
             break;
         case '4':
+            switch (context->cmd_buf[0]) {
+                case 0x01:
+                    render = key_set_type(context, CHUNK_TYPE_UINT32);
+                    break;
+                case 0x02:
+                    render = key_set_type(context, CHUNK_TYPE_INT32);
+                    break;
+                case 0x03:
+                    render = key_set_type(context, CHUNK_TYPE_FLOAT32);
+                    break;
+                default:
+                    break;
+            }
+            context->mode = CURSES_MODE_MOVE;
             break;
         case '8':
+            switch (context->cmd_buf[0]) {
+                case 0x01:
+                    render = key_set_type(context, CHUNK_TYPE_UINT64);
+                    break;
+                case 0x02:
+                    render = key_set_type(context, CHUNK_TYPE_INT64);
+                    break;
+                case 0x03:
+                    render = key_set_type(context, CHUNK_TYPE_FLOAT64);
+                    break;
+                default:
+                    break;
+            }
+            context->mode = CURSES_MODE_MOVE;
             break;
         default:
             break;
@@ -501,12 +614,10 @@ void loop(c_context_t* context) {
 }
 
 void init_context(c_context_t* context) {
+    memset(context, 0, sizeof(c_context_t));
     context->fd = -1;
     context->tabstop = 2;
     context->mode = CURSES_MODE_MOVE;
-    memset(context->cursor_path, 0, 256);
-    context->cursor_path_idx = 0;
-    context->item_idx = 0;
 }
 
 void initcolors() {
@@ -532,6 +643,7 @@ void initcolors() {
     init_pair(0x0d, COLOR_GREEN, COLOR_BLACK);
     init_pair(0x0e, COLOR_WHITE, COLOR_BLACK);
     init_pair(0x0f, COLOR_RED, COLOR_BLACK);
+    init_pair(0x10, COLOR_YELLOW, COLOR_BLACK);
 
     init_pair(0x11, COLOR_BLACK, COLOR_BLUE);
     init_pair(0x12, COLOR_BLACK, COLOR_BLUE);
@@ -548,6 +660,7 @@ void initcolors() {
     init_pair(0x1d, COLOR_BLACK, COLOR_GREEN);
     init_pair(0x1e, COLOR_BLACK, COLOR_WHITE);
     init_pair(0x1f, COLOR_BLACK, COLOR_RED);
+    init_pair(0x20, COLOR_YELLOW, COLOR_YELLOW);
 }
 
 void init() {

@@ -10,28 +10,23 @@
 #define FLAG_SELECT(n, f)    (n->flags |= (1 << f))
 #define FLAG_UNSELECT(n, f)  (n->flags &= ~(1 << f))
 
-typedef struct chunk_node_change {
-    uint64_t insert_at;
-    uint8_t* data;
-    uint64_t nr_children;
-} chunk_node_change_t;
-
 typedef struct chunk_node chunk_node_t;
 
 typedef struct chunk_node {
     chunk_type_t type;
     uint8_t flags;
-    uint8_t bytes_per_type;
+    uint64_t data_length;
     uint8_t* address;
     uint8_t* data;
     uint64_t nr_children;
     chunk_node_t* children;
-    chunk_node_change_t* change;
 } chunk_node_t;
 
 chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_addr);
 
 chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location);
+
+void chunk_node_load_data_unrealise(chunk_node_t* node);
 
 void chunk_node_destroy(chunk_node_t* node);
 
