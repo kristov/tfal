@@ -4,6 +4,19 @@
 #include "chunk.h"
 #include "utf8.h"
 
+uint64_t chunk_node_size(chunk_node_t* node) {
+    uint64_t size = 0;
+    if (node->type == CHUNK_TYPE_SET) {
+        size = 9;
+        for (uint64_t i = 0; i < node->nr_children; i++) {
+            chunk_node_t* child = &node->children[i];
+            size += chunk_node_size(child);
+        }
+        return size;
+    }
+    return chunk_nr_length_bytes(node->data_length) + 1 + node->data_length;
+}
+
 chunk_node_t* chunk_node_make() {
     chunk_node_t* node = malloc(sizeof(chunk_node_t));
     memset(node, 0, sizeof(chunk_node_t));
@@ -13,9 +26,7 @@ chunk_node_t* chunk_node_make() {
 void chunk_node_init(chunk_node_t* node, chunk_t chunk, uint8_t* start) {
     node->type = chunk.type;
     node->address = chunk.address;
-    node->data = chunk.data;
     node->data_length = chunk.data_length;
-    FLAG_SELECT(node, NODE_FLAG_REALISED);
     switch (chunk.type) {
         case CHUNK_TYPE_SET:
             node->nr_children = chunk_set_nr_items(chunk);
@@ -26,6 +37,10 @@ void chunk_node_init(chunk_node_t* node, chunk_t chunk, uint8_t* start) {
         default:
             node->nr_children = chunk.data_length / chunk_bytes_per_type(node->type);
             break;
+    }
+    if (chunk.type != CHUNK_TYPE_SET) {
+        node->data = malloc(sizeof(uint8_t) * chunk.data_length);
+        memcpy(node->data, chunk.data, chunk.data_length);
     }
 }
 
@@ -44,6 +59,27 @@ chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_
     return chunk_node_select(child, &addr[1], nr_addr);
 }
 
+uint8_t* chunk_node_data_insert(chunk_node_t* node, uint64_t location, uint8_t* data, uint64_t nr_bytes) {
+    if (node->type == CHUNK_TYPE_SET) {
+        return NULL;
+    }
+    if (location > node->data_length) {
+        return NULL;
+    }
+    uint8_t* data_new = malloc(sizeof(uint8_t) * (node->data_length + nr_bytes));
+
+    if (location == node->data_length) {
+        memcpy(&data_new[0], node->data, sizeof(uint8_t) * node->data_length);
+    }
+    else {
+        if (location > 0) {
+            memcpy(&data_new[0], &node->data[0], sizeof(uint8_t) * location);
+        }
+        memcpy(&data_new[location + 1], &node->data[location], sizeof(uint8_t) * (node->data_length - location));
+    }
+    return node->data;
+}
+
 chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
     if (node->type != CHUNK_TYPE_SET) {
         return NULL;
@@ -54,7 +90,7 @@ chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
     chunk_node_t* children_new = malloc(sizeof(chunk_node_t) * (node->nr_children + 1));
 
     if (location == node->nr_children) {
-        memcpy(children_new, node->children, sizeof(chunk_node_t) * node->nr_children);
+        memcpy(&children_new[0], node->children, sizeof(chunk_node_t) * node->nr_children);
     }
     else {
         if (location > 0) {
@@ -66,15 +102,8 @@ chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location) {
     free(node->children);
     node->children = children_new;
     node->nr_children++;
+    node->data_length = chunk_nr_length_bytes(0) + 1;
     return &children_new[location];
-}
-
-void chunk_node_load_data_unrealise(chunk_node_t* node) {
-    uint64_t bytes_to_load = chunk_bytes_per_type(node->type) * node->nr_children;
-    uint8_t* loaded_data = malloc(bytes_to_load);
-    memcpy(loaded_data, node->data, bytes_to_load);
-    node->data = loaded_data;
-    FLAG_UNSELECT(node, NODE_FLAG_REALISED);
 }
 
 void chunk_node_destroy_tree(chunk_node_t* node) {
@@ -87,7 +116,7 @@ void chunk_node_destroy_tree(chunk_node_t* node) {
         node->children = NULL;
         return;
     }
-    if (!FLAG_SELECTED(node, NODE_FLAG_REALISED)) {
+    if (node->data != NULL) {
         free(node->data);
     }
 }

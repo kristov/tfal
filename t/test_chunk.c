@@ -104,6 +104,7 @@ void test_decode_longer(test_harness_t* test) {
 }
 
 void test_chunk_nr_length_bytes(test_harness_t* test) {
+    is_equal_uint8(test, chunk_nr_length_bytes(0), 1, "test_chunk_nr_length_bytes(): computed length bytes [1]");
     is_equal_uint8(test, chunk_nr_length_bytes(255), 1, "test_chunk_nr_length_bytes(): computed length bytes [1]");
     is_equal_uint8(test, chunk_nr_length_bytes(256), 2, "test_chunk_nr_length_bytes(): computed length bytes [2]");
     is_equal_uint8(test, chunk_nr_length_bytes(65535), 2, "test_chunk_nr_length_bytes(): computed length bytes [2]");

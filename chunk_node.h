@@ -22,7 +22,11 @@ typedef struct chunk_node {
     chunk_node_t* children;
 } chunk_node_t;
 
+uint64_t chunk_node_size(chunk_node_t* node);
+
 chunk_node_t* chunk_node_select(chunk_node_t* node, uint64_t* addr, uint64_t nr_addr);
+
+uint8_t* chunk_node_data_insert(chunk_node_t* node, uint64_t location, uint8_t* data, uint64_t nr_bytes);
 
 chunk_node_t* chunk_node_set_insert(chunk_node_t* node, uint64_t location);
 
