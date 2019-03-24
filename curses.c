@@ -18,10 +18,15 @@
 #define CHUNK_COLOR_WARN 0x10
 #define CHUNK_COLOR_HIGHLIGHT 0x10
 
+#define BIT_TEST(a, f)   ((a >> f) & 1)
+#define BIT_SET(a, f)    (a |= (1 << f))
+#define BIT_UNSET(a, f)  (a &= ~(1 << f))
+
 typedef enum curses_mode {
     CURSES_MODE_MOVE = 0x01,
     CURSES_MODE_TYPE = 0x02,
-    CURSES_MODE_INPUT = 0x03
+    CURSES_MODE_CMDINPUT = 0x03,
+    CURSES_MODE_DATINPUT = 0x04
 } curses_mode_t;
 
 typedef struct c_context {
@@ -34,6 +39,7 @@ typedef struct c_context {
     uint8_t tabstop;
     uint8_t cmd_buf[257];
     uint8_t cmd_buf_idx;
+    uint8_t cmd_ctx;
 } c_context_t;
 
 static const char name_per_type[] = {
@@ -241,7 +247,7 @@ uint8_t draw_chunk_node(c_context_t* context, chunk_node_t* node, uint8_t xoff, 
 
 void draw(c_context_t* context, uint8_t xoff, uint8_t yoff) {
     draw_chunk_node(context, context->root, xoff, yoff);
-    if (context->mode == CURSES_MODE_INPUT) {
+    if (context->mode == CURSES_MODE_CMDINPUT) {
         attron(COLOR_PAIR(CHUNK_COLOR_WARN));
         mvprintw(0, 0, ":%s", context->cmd_buf);
         attroff(COLOR_PAIR(CHUNK_COLOR_WARN));
@@ -389,7 +395,7 @@ uint8_t key_right(c_context_t* context) {
     return key_right_item(context, curr);
 }
 
-uint8_t key_insert_append(c_context_t* context, uint64_t at) {
+uint8_t item_insert_append(c_context_t* context, uint64_t at, chunk_type_t type) {
     chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
     if (curr == NULL) {
         return 0;
@@ -416,56 +422,9 @@ uint8_t key_insert_append(c_context_t* context, uint64_t at) {
         FLAG_SELECT(curr, NODE_FLAG_FOCUS);
         return 0;
     }
+    new->type = type;
     context->cursor_path[context->cursor_path_idx] = at;
     FLAG_SELECT(new, NODE_FLAG_FOCUS);
-    return 1;
-}
-
-uint8_t key_insert(c_context_t* context) {
-    return key_insert_append(context, context->cursor_path[context->cursor_path_idx]);
-}
-
-uint8_t key_append(c_context_t* context) {
-    return key_insert_append(context, context->cursor_path[context->cursor_path_idx] + 1);
-}
-
-uint8_t key_insert_append_item(c_context_t* context, uint64_t at) {
-    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (curr == NULL) {
-        return 0;
-    }
-
-    if (curr->type == CHUNK_TYPE_SET) {
-        return 0;
-    }
-
-    //chunk_node_t* new = chunk_node_data_insert(parent, at);
-    //uint8_t* chunk_node_data_insert(chunk_node_t* node, uint64_t location, uint8_t* data, uint64_t nr_bytes) {
-    return 1;
-}
-
-uint8_t key_insert_item(c_context_t* context) {
-    return key_insert_append_item(context, context->item_idx);
-}
-
-uint8_t key_append_item(c_context_t* context) {
-    return key_insert_append_item(context, context->item_idx + 1);
-}
-
-uint8_t key_set_type(c_context_t* context, chunk_type_t type) {
-    chunk_node_t* curr = chunk_node_select(context->root, context->cursor_path, context->cursor_path_idx + 1);
-    if (curr == NULL) {
-        return 0;
-    }
-    if (FLAG_SELECTED(curr, NODE_FLAG_REALISED)) {
-        mvprintw(0, 0, "can not change type of realised item");
-        return 0;
-    }
-    if (curr->type == 0x00) {
-        curr->type = type;
-        return 1;
-    }
-    // Convert existing data to new type if any
     return 1;
 }
 
@@ -491,16 +450,12 @@ uint8_t handle_mode_move(c_context_t* context, int c) {
             render = key_right(context);
             break;
         case ':':
-            context->mode = CURSES_MODE_INPUT;
+            context->mode = CURSES_MODE_CMDINPUT;
             break;
         default:
             break;
     }
     return render;
-}
-
-uint8_t handle_mode_type(c_context_t* context, int c) {
-    return 0;
 }
 
 uint8_t interpret_insert_append(c_context_t* context, uint8_t append) {
@@ -519,44 +474,96 @@ uint8_t interpret_insert_append(c_context_t* context, uint8_t append) {
     return 1;
 }
 
-uint8_t interpret_command_buffer(c_context_t* context) {
-    uint8_t render = 1;
-    switch (context->cmd_buf[0]) {
-        case 'i':
-            render = interpret_insert_append(context, 0);
-            break;
-        case 'a':
-            render = key_append(context);
-            break;
-        case 'l':
-            render = key_report_length(context);
-            break;
-    }
-    context->mode = CURSES_MODE_MOVE;
+uint8_t reset_buffer(c_context_t* context, uint8_t render, curses_mode_t mode) {
+    context->mode = mode;
     memset(context->cmd_buf, 0, 257);
     context->cmd_buf_idx = 0;
     return render;
 }
 
-uint8_t handle_mode_input(c_context_t* context, int c) {
-    //uint8_t render = 1;
-    if ((c >= 0x20) && (c <= 0x7e)) {
-        context->cmd_buf[context->cmd_buf_idx] = c;
-        context->cmd_buf_idx++;
-        return 1;
+uint8_t interpret_command(c_context_t* context) {
+    uint8_t append = 0;
+    uint64_t at = context->cursor_path[context->cursor_path_idx];
+    char *token = strtok((char*)context->cmd_buf, " ");
+    switch (token[0]) {
+        case 'i':
+            append = 0;
+            break;
+        case 'a':
+            append = 1;
+            break;
+        default:
+            return reset_buffer(context, 0, CURSES_MODE_MOVE);
+            break;
     }
-    if (c == 0x0a) {
-        context->mode = CURSES_MODE_MOVE;
-        return interpret_command_buffer(context);
+    token[0] = 'X';
+    if (strcmp(token, "Xi1") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_UINT8);
     }
-    if (c == KEY_BACKSPACE) {
-        if (context->cmd_buf_idx != 0) {
-            context->cmd_buf_idx--;
-        }
-        context->cmd_buf[context->cmd_buf_idx] = '\0';
-        return 1;
+    if (strcmp(token, "XI1") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_INT8);
     }
-    return 0;
+    if (strcmp(token, "Xi2") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_UINT16);
+    }
+    if (strcmp(token, "XI2") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_INT16);
+    }
+    if (strcmp(token, "Xi4") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_UINT32);
+    }
+    if (strcmp(token, "XI4") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_INT32);
+    }
+    if (strcmp(token, "Xi8") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_UINT64);
+    }
+    if (strcmp(token, "XI8") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_INT64);
+    }
+    if (strcmp(token, "Xf4") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_FLOAT32);
+    }
+    if (strcmp(token, "Xf8") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_FLOAT64);
+    }
+    if (strcmp(token, "Xs") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_UTF8);
+    }
+    if (strcmp(token, "XR") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_REF);
+    }
+    if (strcmp(token, "X[") == 0) {
+        item_insert_append(context, at + append, CHUNK_TYPE_SET);
+    }
+    return reset_buffer(context, 1, CURSES_MODE_MOVE);
+}
+
+uint8_t handle_mode_cmdinput(c_context_t* context, int c) {
+    uint8_t render = 0;
+    switch (c) {
+        case 0x20:
+            render = interpret_command(context);
+            break;
+        case 0x0a:
+            render = interpret_command(context);
+            break;
+        case KEY_BACKSPACE:
+            if (context->cmd_buf_idx != 0) {
+                context->cmd_buf_idx--;
+            }
+            context->cmd_buf[context->cmd_buf_idx] = '\0';
+            render = 1;
+            break;
+        default:
+            if ((c >= 0x21) && (c <= 0x7e)) {
+                context->cmd_buf[context->cmd_buf_idx] = c;
+                context->cmd_buf_idx++;
+                render = 1;
+            }
+            break;
+    }
+    return render;
 }
 
 void loop(c_context_t* context) {
@@ -568,12 +575,12 @@ void loop(c_context_t* context) {
             case CURSES_MODE_MOVE:
                 render = handle_mode_move(context, c);
                 break;
-            case CURSES_MODE_TYPE:
-                render = handle_mode_type(context, c);
+            case CURSES_MODE_CMDINPUT:
+                render = handle_mode_cmdinput(context, c);
                 break;
-            case CURSES_MODE_INPUT:
-                render = handle_mode_input(context, c);
-                break;
+//            case CURSES_MODE_DATINPUT:
+//                render = handle_mode_datinput(context, c);
+//                break;
             default:
                 break;
         }

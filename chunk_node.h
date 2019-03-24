@@ -6,9 +6,14 @@
 
 #define NODE_FLAG_FOCUS 0x00
 #define NODE_FLAG_REALISED 0x01
-#define FLAG_SELECTED(n, f)  ((n->flags >> f) & 1)
-#define FLAG_SELECT(n, f)    (n->flags |= (1 << f))
-#define FLAG_UNSELECT(n, f)  (n->flags &= ~(1 << f))
+
+#define BIT_TEST(a, f)   ((a >> f) & 1)
+#define BIT_SET(a, f)    (a |= (1 << f))
+#define BIT_UNSET(a, f)  (a &= ~(1 << f))
+
+#define FLAG_SELECTED(n, f)  BIT_TEST(n->flags, f)
+#define FLAG_SELECT(n, f)    BIT_SET(n->flags, f)
+#define FLAG_UNSELECT(n, f)  BIT_UNSET(n->flags, f)
 
 typedef struct chunk_node chunk_node_t;
 
