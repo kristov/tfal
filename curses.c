@@ -12,15 +12,14 @@
 #include "chunk.h"
 #include "chunk_node.h"
 #include "utf8.h"
+#include "bitwise.h"
 
 #define CHUNK_COLOR_DATA 0x0e
 #define CHUNK_COLOR_ERROR 0x0f
 #define CHUNK_COLOR_WARN 0x10
 #define CHUNK_COLOR_HIGHLIGHT 0x10
 
-#define BIT_TEST(a, f)   ((a >> f) & 1)
-#define BIT_SET(a, f)    (a |= (1 << f))
-#define BIT_UNSET(a, f)  (a &= ~(1 << f))
+#define CURSOR_FLAG_IN_DATA 1
 
 typedef enum curses_mode {
     CURSES_MODE_MOVE = 0x01,
@@ -35,6 +34,7 @@ typedef struct c_context {
     curses_mode_t mode;
     uint64_t cursor_path[256];
     uint8_t cursor_path_idx;
+    uint8_t flags;
     uint64_t item_idx;
     uint8_t tabstop;
     uint8_t cmd_buf[257];
@@ -72,7 +72,7 @@ void draw_item_uint8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uin
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[4];
     uint8_t* data = (uint8_t*)node->data;
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+    if (BIT_TEST(context->flags, CURSOR_FLAG_IN_DATA) && BIT_TEST(node->flags, NODE_FLAG_FOCUS)) {
         for (uint8_t i = 0; i < node->nr_children; i++) {
             uint8_t v = data[i];
             sprintf(num, "%u", v);
@@ -105,7 +105,7 @@ void draw_item_float64(c_context_t* context, chunk_node_t* node, uint8_t xoff, u
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
     char num[2048];
     double* data = (double*)node->data;
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+    if (BIT_TEST(context->flags, CURSOR_FLAG_IN_DATA) && BIT_TEST(node->flags, NODE_FLAG_FOCUS)) {
         for (uint8_t i = 0; i < node->nr_children; i++) {
             v = data[i];
             sprintf(num, "%lf", v);
@@ -138,7 +138,7 @@ void draw_item_utf8(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
     uint32_t next[2];
     char* s = (char*)node->data;
     attron(COLOR_PAIR(CHUNK_COLOR_DATA));
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+    if (BIT_TEST(context->flags, CURSOR_FLAG_IN_DATA) && BIT_TEST(node->flags, NODE_FLAG_FOCUS)) {
         for (uint8_t i = 0; i < node->nr_children; i++) {
             next[0] = u8_nextchar(s, &cn);
             next[1] = 0;
@@ -208,7 +208,7 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
     if (node->type == 0) {
         color = CHUNK_COLOR_ERROR;
     }
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+    if (BIT_TEST(node->flags, NODE_FLAG_FOCUS)) {
         color += CHUNK_COLOR_HIGHLIGHT;
     }
     attron(COLOR_PAIR(color));
@@ -221,7 +221,7 @@ void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t y
 
 void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     uint8_t highlight = 0;
-    if (FLAG_SELECTED(node, NODE_FLAG_FOCUS)) {
+    if (BIT_TEST(node->flags, NODE_FLAG_FOCUS)) {
         highlight = CHUNK_COLOR_HIGHLIGHT;
     }
     attron(COLOR_PAIR(node->type + highlight));
@@ -306,8 +306,10 @@ uint8_t key_up(c_context_t* context) {
         context->cursor_path[context->cursor_path_idx]++;
         return 0;
     }
-    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
-    FLAG_SELECT(next, NODE_FLAG_FOCUS);
+    context->item_idx = 0;
+    BIT_UNSET(context->flags, CURSOR_FLAG_IN_DATA);
+    BIT_UNSET(curr->flags, NODE_FLAG_FOCUS);
+    BIT_SET(next->flags, NODE_FLAG_FOCUS);
     next->flags |= (1 << 0);
     return 1;
 }
@@ -323,8 +325,10 @@ uint8_t key_down(c_context_t* context) {
         context->cursor_path[context->cursor_path_idx]--;
         return 0;
     }
-    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
-    FLAG_SELECT(next, NODE_FLAG_FOCUS);
+    context->item_idx = 0;
+    BIT_UNSET(context->flags, CURSOR_FLAG_IN_DATA);
+    BIT_UNSET(curr->flags, NODE_FLAG_FOCUS);
+    BIT_SET(next->flags, NODE_FLAG_FOCUS);
     return 1;
 }
 
@@ -338,17 +342,21 @@ uint8_t key_left_set(c_context_t* context, chunk_node_t* curr) {
         context->cursor_path_idx++;
         return 0;
     }
-    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
-    FLAG_SELECT(next, NODE_FLAG_FOCUS);
+    BIT_UNSET(curr->flags, NODE_FLAG_FOCUS);
+    BIT_SET(next->flags, NODE_FLAG_FOCUS);
     return 1;
 }
 
 uint8_t key_left_item(c_context_t* context, chunk_node_t* curr) {
-    if (context->item_idx == 0) {
-        return key_left_set(context, curr);
+    if (BIT_TEST(context->flags, CURSOR_FLAG_IN_DATA)) {
+        if (context->item_idx == 0) {
+            BIT_UNSET(context->flags, CURSOR_FLAG_IN_DATA);
+            return 1;
+        }
+        context->item_idx--;
+        return 1;
     }
-    context->item_idx--;
-    return 1;
+    return key_left_set(context, curr);
 }
 
 uint8_t key_left(c_context_t* context) {
@@ -370,12 +378,17 @@ uint8_t key_right_set(c_context_t* context, chunk_node_t* curr) {
         context->cursor_path_idx--;
         return 0;
     }
-    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
-    FLAG_SELECT(next, NODE_FLAG_FOCUS);
+    BIT_UNSET(curr->flags, NODE_FLAG_FOCUS);
+    BIT_SET(next->flags, NODE_FLAG_FOCUS);
     return 1;
 }
 
 uint8_t key_right_item(c_context_t* context, chunk_node_t* curr) {
+    if (!BIT_TEST(context->flags, CURSOR_FLAG_IN_DATA)) {
+        BIT_SET(context->flags, CURSOR_FLAG_IN_DATA);
+        context->item_idx = 0;
+        return 1;
+    }
     if ((context->item_idx + 1) >= curr->nr_children) {
         context->item_idx = 0;
         return 1;
@@ -416,15 +429,15 @@ uint8_t item_insert_append(c_context_t* context, uint64_t at, chunk_type_t type)
         return 0;
     }
 
-    FLAG_UNSELECT(curr, NODE_FLAG_FOCUS);
+    BIT_UNSET(curr->flags, NODE_FLAG_FOCUS);
     chunk_node_t* new = chunk_node_set_insert(parent, at);
     if (new == NULL) {
-        FLAG_SELECT(curr, NODE_FLAG_FOCUS);
+        BIT_SET(curr->flags, NODE_FLAG_FOCUS);
         return 0;
     }
     new->type = type;
     context->cursor_path[context->cursor_path_idx] = at;
-    FLAG_SELECT(new, NODE_FLAG_FOCUS);
+    BIT_SET(new->flags, NODE_FLAG_FOCUS);
     return 1;
 }
 
@@ -497,28 +510,28 @@ uint8_t interpret_command(c_context_t* context) {
             break;
     }
     token[0] = 'X';
-    if (strcmp(token, "Xi1") == 0) {
+    if (strcmp(token, "XI1") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT8);
     }
-    if (strcmp(token, "XI1") == 0) {
+    if (strcmp(token, "Xi1") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT8);
     }
-    if (strcmp(token, "Xi2") == 0) {
+    if (strcmp(token, "XI2") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT16);
     }
-    if (strcmp(token, "XI2") == 0) {
+    if (strcmp(token, "Xi2") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT16);
     }
-    if (strcmp(token, "Xi4") == 0) {
+    if (strcmp(token, "XI4") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT32);
     }
-    if (strcmp(token, "XI4") == 0) {
+    if (strcmp(token, "Xi4") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT32);
     }
-    if (strcmp(token, "Xi8") == 0) {
+    if (strcmp(token, "XI8") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT64);
     }
-    if (strcmp(token, "XI8") == 0) {
+    if (strcmp(token, "Xi8") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT64);
     }
     if (strcmp(token, "Xf4") == 0) {
