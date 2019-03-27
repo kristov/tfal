@@ -42,21 +42,21 @@ typedef struct c_context {
     uint8_t cmd_ctx;
 } c_context_t;
 
-static const char name_per_type[] = {
-    '?',
-    'I',
-    'i',
-    'I',
-    'i',
-    'I',
-    'i',
-    'I',
-    'i',
-    'f',
-    'f',
-    's',
-    'R',
-    '['
+static const char* name_per_type[] = {
+    "?",
+    "i8",
+    "I8",
+    "i16",
+    "I16",
+    "i32",
+    "I32",
+    "i64",
+    "I64",
+    "f32",
+    "f64",
+    "s",
+    "R",
+    "["
 };
 
 void draw_box(uint8_t xoff, uint8_t yoff, uint8_t w, uint8_t h) {
@@ -203,7 +203,7 @@ void draw_item_data(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint
 void draw_item(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yoff) {
     char head[24];
     memset(head, 0, 24);
-    sprintf(head, "%c%u:%lu", name_per_type[node->type], chunk_bytes_per_type(node->type), node->nr_children);
+    sprintf(head, "%s:%lu", name_per_type[node->type], node->nr_children);
     uint8_t color = node->type;
     if (node->type == 0) {
         color = CHUNK_COLOR_ERROR;
@@ -226,7 +226,7 @@ void draw_set(c_context_t* context, chunk_node_t* node, uint8_t xoff, uint8_t yo
     }
     attron(COLOR_PAIR(node->type + highlight));
     draw_box(xoff, yoff, 2, 1);
-    mvprintw(yoff, xoff, "%c:%lu", name_per_type[13], node->nr_children);
+    mvprintw(yoff, xoff, "[:%lu", node->nr_children);
     attroff(COLOR_PAIR(node->type + highlight));
 }
 
@@ -510,34 +510,34 @@ uint8_t interpret_command(c_context_t* context) {
             break;
     }
     token[0] = 'X';
-    if (strcmp(token, "XI1") == 0) {
+    if (strcmp(token, "Xi8") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT8);
     }
-    if (strcmp(token, "Xi1") == 0) {
+    if (strcmp(token, "XI8") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT8);
     }
-    if (strcmp(token, "XI2") == 0) {
+    if (strcmp(token, "Xi16") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT16);
     }
-    if (strcmp(token, "Xi2") == 0) {
+    if (strcmp(token, "XI16") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT16);
     }
-    if (strcmp(token, "XI4") == 0) {
+    if (strcmp(token, "Xi32") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT32);
     }
-    if (strcmp(token, "Xi4") == 0) {
+    if (strcmp(token, "XI32") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT32);
     }
-    if (strcmp(token, "XI8") == 0) {
+    if (strcmp(token, "Xi64") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_UINT64);
     }
-    if (strcmp(token, "Xi8") == 0) {
+    if (strcmp(token, "XI64") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_INT64);
     }
-    if (strcmp(token, "Xf4") == 0) {
+    if (strcmp(token, "Xf32") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_FLOAT32);
     }
-    if (strcmp(token, "Xf8") == 0) {
+    if (strcmp(token, "Xf64") == 0) {
         item_insert_append(context, at + append, CHUNK_TYPE_FLOAT64);
     }
     if (strcmp(token, "Xs") == 0) {
