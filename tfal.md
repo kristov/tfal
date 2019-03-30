@@ -19,18 +19,17 @@ Defining functions and calling them are done using several opcode structures:
 
 ## Function definition:
 
-This opcode defines a new function. The set that defines the function is made up of two items. The first item is a set that stores empty (or pre-initialised) values for funcion arguments, scope storage for local function variables and space allocated for return data. This set will be copied onto the stack and the arg values populated by calling code. The second set is a list of expressions (opcodes) that makes up the body.
+There is no opcode for defining a new function. The set that defines the function is made up of two items. The first item is a set that stores empty (or pre-initialised) values for funcion arguments, scope storage for local function variables and space allocated for return data. This set will be copied onto the stack and the arg values populated by calling code. The second set is a list of expressions (opcodes) that makes up the body.
 
     [
-      i8:DEFUN
       [
-        [
-          [arg space]
-          [scope space]
-          [return space]
-        ]
-        [body]
+        [arg space]
+        [scope space]
+        [return space]
       ]
+      [body]
+      s: name
+      s: doc
     ]
 
 ## Function calls

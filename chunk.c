@@ -57,8 +57,8 @@ uint8_t* chunk_write_header(uint8_t* data, chunk_type_t type, uint64_t length) {
         nr_length_bytes = chunk_nr_length_bytes(length);
     }
     uint8_t head = 0;
-    head = (head & 0xf0) | (type & 0xf);
-    head = (head & 0x0f) | ((nr_length_bytes & 0xf) << 4);
+    head = (head & 0xf0) | (type & 0x0f);
+    head = (head & 0x0f) | ((nr_length_bytes & 0x0f) << 4);
     *data = head;
     data++;
     return chunk_write_length_bytes(data, nr_length_bytes, length);
